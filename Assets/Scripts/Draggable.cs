@@ -5,7 +5,8 @@ using UnityEngine.EventSystems;
 public class Draggable :
     MonoBehaviour,
     IBeginDragHandler,
-    IDragHandler
+    IDragHandler,
+    IEndDragHandler
 {
     Vector3 pointerOffset;
     float zDistance;
@@ -20,6 +21,14 @@ public class Draggable :
     public void OnDrag(PointerEventData eventData)
     {
         transform.position = PointerToWorld(eventData, EventCamera(eventData)) + pointerOffset;
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (Grid.Instance != null)
+        {
+            transform.position = Grid.Instance.SnapToWorld(transform.position);
+        }
     }
 
     Vector3 PointerToWorld(PointerEventData eventData, Camera camera)
