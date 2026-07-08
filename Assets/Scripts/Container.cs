@@ -23,6 +23,9 @@ public interface IResolution
 
 public class Container
 {
+    // Claim order, not just membership, letting tokens stack into the next open slot
+    // instead of whichever cell was literally dropped on (which could overlap another member).
+    public readonly List<Vector2Int> OrderedCells;
     public readonly HashSet<Vector2Int> Cells;
     public readonly Color Color;
     public readonly List<Token> Members = new List<Token>();
@@ -32,13 +35,16 @@ public class Container
     public ICompletionPredicate CompletionPredicate;
     public IResolution Resolution;
 
-    public int Capacity => Cells.Count;
+    public int Capacity => OrderedCells.Count;
 
-    public Container(HashSet<Vector2Int> cells, Color color)
+    public Container(List<Vector2Int> orderedCells, Color color)
     {
-        Cells = cells;
+        OrderedCells = orderedCells;
+        Cells = new HashSet<Vector2Int>(orderedCells);
         Color = color;
     }
+
+    public Vector2Int NextAvailableCell() => OrderedCells[Members.Count];
 
     public bool CanAccept(Token token)
     {
@@ -57,7 +63,12 @@ public class Container
 
         Members.Add(token);
         token.CurrentContainer = this;
-        CheckCompletion();
+
+        if (CompletionPredicate != null && CompletionPredicate.IsComplete(this))
+        {
+            Resolution?.Resolve(this);
+        }
+        
         return true;
     }
 
@@ -77,13 +88,5 @@ public class Container
         Members.Remove(token);
         if (token.CurrentContainer == this) token.CurrentContainer = null;
         return true;
-    }
-
-    void CheckCompletion()
-    {
-        if (CompletionPredicate != null && CompletionPredicate.IsComplete(this))
-        {
-            Resolution?.Resolve(this);
-        }
     }
 }

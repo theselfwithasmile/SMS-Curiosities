@@ -50,9 +50,9 @@ public class Draggable :
         Vector2Int cell = Grid.Instance.WorldToCell(transform.position);
         IReadOnlyList<Container> candidates = Grid.Instance.GetContainersAt(cell);
 
-        if (candidates.Count > 0 && TryEnterAll(candidates))
+        if (candidates.Count > 0 && TryEnterAll(candidates, out Vector2Int targetCell))
         {
-            transform.position = Grid.Instance.CellToWorld(cell);
+            transform.position = Grid.Instance.CellToWorld(targetCell);
         }
         else
         {
@@ -61,12 +61,17 @@ public class Draggable :
         }
     }
 
-    bool TryEnterAll(IReadOnlyList<Container> containers)
+    // Snaps into the container's next open slot (claim order) rather than the exact cell
+    // dropped on, so two tokens accepted into the same multi-cell container never overlap.
+    bool TryEnterAll(IReadOnlyList<Container> containers, out Vector2Int targetCell)
     {
+        targetCell = default;
         for (int i = 0; i < containers.Count; i++)
         {
             if (!containers[i].CanAccept(token)) return false;
         }
+
+        targetCell = containers[0].NextAvailableCell();
         for (int i = 0; i < containers.Count; i++)
         {
             containers[i].TryAccept(token);

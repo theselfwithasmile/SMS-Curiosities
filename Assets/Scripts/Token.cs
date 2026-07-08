@@ -4,4 +4,5 @@ using UnityEngine;
 public class Token : MonoBehaviour
 {
     public Container CurrentContainer;
+    public int Group;
 }

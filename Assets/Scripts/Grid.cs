@@ -10,6 +10,10 @@ public class Grid : MonoBehaviour
     [SerializeField] float dotScale = 0.15f;
     [SerializeField] Color dotColor = Color.white;
     [SerializeField, Range(0f, 0.4f)] float viewportPadding = 0.05f;
+    [SerializeField] Token tokenPrefab;
+
+    public int Columns => columns;
+    public int Rows => rows;
 
     const int MaxInstancesPerBatch = 1023;
 
@@ -72,16 +76,46 @@ public class Grid : MonoBehaviour
         return CellCenter(cell.x, cell.y);
     }
 
-    public Vector3 SnapToWorld(Vector3 worldPosition)
-    {
-        Vector3 snapped = CellToWorld(WorldToCell(worldPosition));
-        snapped.z = worldPosition.z;
-        return snapped;
-    }
-
     public IReadOnlyList<Container> GetContainersAt(Vector2Int cell)
     {
         return cellMemberships.TryGetValue(cell, out List<Container> list) ? list : NoContainers;
+    }
+
+    public Token SpawnToken(int group, Vector3 worldPosition)
+    {
+        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity);
+        token.Group = group;
+        return token;
+    }
+
+    // Claims an exact rectangular region rather than growing randomly - for deliberately placed
+    // regions (e.g. the bench) rather than procedurally shaped puzzle containers.
+    public Container CreateFixedContainer(RectInt bounds, Color color)
+    {
+        var cells = new List<Vector2Int>();
+        for (int y = bounds.yMin; y < bounds.yMax; y++)
+        {
+            for (int x = bounds.xMin; x < bounds.xMax; x++)
+            {
+                var cell = new Vector2Int(x, y);
+                if (!cellMemberships.ContainsKey(cell)) cells.Add(cell);
+            }
+        }
+        return RegisterContainer(cells, color);
+    }
+
+    public void RemoveContainer(Container container)
+    {
+        Containers.Remove(container);
+        containerMaterials.Remove(container);
+        foreach (Vector2Int cell in container.Cells)
+        {
+            if (cellMemberships.TryGetValue(cell, out List<Container> owners))
+            {
+                owners.Remove(container);
+                if (owners.Count == 0) cellMemberships.Remove(cell);
+            }
+        }
     }
 
     // Randomized region growth: claims a random unclaimed seed cell, then repeatedly claims a
@@ -105,6 +139,7 @@ public class Grid : MonoBehaviour
         
         Vector2Int seed = unclaimed[Random.Range(0, unclaimed.Count)];
         var claimed = new HashSet<Vector2Int> { seed };
+        var orderedClaimed = new List<Vector2Int> { seed };
         var frontier = new List<Vector2Int>();
         AddFrontier(seed, claimed, frontier);
 
@@ -117,13 +152,18 @@ public class Grid : MonoBehaviour
             if (claimed.Contains(next)) continue;
 
             claimed.Add(next);
+            orderedClaimed.Add(next);
             AddFrontier(next, claimed, frontier);
         }
 
-        //creates containers
-        var container = new Container(claimed, color);
+        return RegisterContainer(orderedClaimed, color);
+    }
+
+    Container RegisterContainer(List<Vector2Int> cells, Color color)
+    {
+        var container = new Container(cells, color);
         Containers.Add(container);
-        foreach (Vector2Int cell in claimed)
+        foreach (Vector2Int cell in cells)
         {
             if (!cellMemberships.TryGetValue(cell, out List<Container> owners))
             {
