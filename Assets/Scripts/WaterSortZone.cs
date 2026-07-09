@@ -5,28 +5,29 @@ public class WaterSortZone : MonoBehaviour
 {
     [SerializeField] int tubeCount = 3;
     [SerializeField] int tubeCapacity = 3;
-    [SerializeField] Color[] groupColors;
 
     void Start()
     {
         Grid grid = Grid.Instance;
+        ContainerManager containers = ContainerManager.Instance;
 
+        //generate bench
         int totalTokens = tubeCount * tubeCapacity;
         int benchRows = Mathf.Max(1, Mathf.CeilToInt(totalTokens / (float)grid.Columns));
-        Container bench = grid.CreateFixedContainer(new RectInt(0, 0, grid.Columns, benchRows), Color.gray);
+        Container bench = containers.CreateFixedContainer(new RectInt(0, 0, grid.Columns, benchRows), Color.gray);
 
         //generate containers
         var tubes = new List<Container>();
         for (int group = 0; group < tubeCount; group++)
         {
-            Container tube = grid.GenerateContainer(tubeCapacity, GroupColor(group), Vector2Int.up, 1f);
+            Container tube = containers.GenerateContainer(tubeCapacity, GameState.Instance.GroupColor(group), Vector2Int.up, 1f);
             if (tube == null) continue;
 
             //enforce containers rules
             tube.EntryConstraints.Add(new GroupMatchConstraint());
             tube.CompletionPredicate = new FullPredicate();
             tube.Resolution = new SpawnTokenResolution(bench);
-            
+
             tubes.Add(tube);
         }
 
@@ -45,15 +46,10 @@ public class WaterSortZone : MonoBehaviour
         foreach (int group in groups)
         {
             Vector2Int cell = bench.NextAvailableCell();
-            Token token = grid.SpawnToken(group, grid.CellToWorld(cell));
-            token.GetComponent<SpriteRenderer>().color = GroupColor(group);
+            Token token = containers.SpawnToken(group, grid.CellToWorld(cell));
+            token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
             bench.TryAccept(token);
         }
-    }
-
-    Color GroupColor(int group)
-    {
-        return groupColors.Length > 0 ? groupColors[group % groupColors.Length] : Color.white;
     }
 
     static void Shuffle(List<int> list)

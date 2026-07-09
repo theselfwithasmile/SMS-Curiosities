@@ -14,7 +14,7 @@ public class Spawner : MonoBehaviour
         {
             GameObject token = Instantiate(tokenPrefab, transform.position, Quaternion.identity);
         }
-        Grid.Instance.GenerateContainer(capacity: 10, color: Color.red);
+        ContainerManager.Instance.GenerateContainer(capacity: 10, color: Color.red);
     }
 
     // Update is called once per frame

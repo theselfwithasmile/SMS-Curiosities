@@ -21,6 +21,16 @@ public interface IResolution
     void Resolve(Container container);
 }
 
+// What happens when a token is dropped onto a cell that's already occupied (e.g. Merge's
+// combine, Toon Blast's swap) - distinct from IEntryConstraint, which only gates empty slots.
+public interface IOccupantInteraction
+{
+    // incomingOrigin is where the dragged token was removed from at drag-start (already vacated
+    // by the time this runs) - null if it wasn't in a container. Needed for swaps, which put the
+    // occupant there; ignored by non-swap interactions like Merge.
+    bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container);
+}
+
 public class Container
 {
     // Claim order, not just membership, letting tokens stack into the next open slot
@@ -34,6 +44,7 @@ public class Container
     public readonly List<IExitConstraint> ExitConstraints = new List<IExitConstraint>();
     public ICompletionPredicate CompletionPredicate;
     public IResolution Resolution;
+    public IOccupantInteraction OccupantInteraction;
 
     public int Capacity => OrderedCells.Count;
 
@@ -70,6 +81,14 @@ public class Container
         }
         
         return true;
+    }
+
+    // Only tried by Draggable when CanAccept fails due to capacity, not due to an entry
+    // constraint rejecting the token outright.
+    public bool TryInteractWithOccupant(Token incoming, Container incomingOrigin)
+    {
+        return OccupantInteraction != null && Members.Count == 1
+            && OccupantInteraction.TryInteract(incoming, incomingOrigin, Members[0], this);
     }
 
     public bool CanRemove(Token token)

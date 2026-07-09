@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GroupMatchConstraint : IEntryConstraint
@@ -58,12 +59,113 @@ public class SpawnTokenResolution : IResolution
         Vector2Int spawnCell = destination.Members.Count < destination.Capacity
             ? destination.NextAvailableCell()
             : container.NextAvailableCell();
-        Token grouped = Grid.Instance.SpawnToken(group, Grid.Instance.CellToWorld(spawnCell));
+        Token grouped = ContainerManager.Instance.SpawnToken(group, Grid.Instance.CellToWorld(spawnCell));
+        grouped.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
         destination.TryAccept(grouped);
 
         if (consumeContainer)
         {
-            Grid.Instance.RemoveContainer(container);
+            ContainerManager.Instance.RemoveContainer(container);
+        }
+    }
+}
+
+// Merge (2048-style): dropping onto a same-group, same-tier occupant combines them into one
+// higher-tier token in place, instead of the drop being rejected outright.
+public class MergeInteraction : IOccupantInteraction
+{
+    public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
+    {
+        if (incoming.Group != occupant.Group || incoming.Tier != occupant.Tier) return false;
+
+        Vector2Int cell = container.OrderedCells[0];
+        int group = incoming.Group;
+        int nextTier = incoming.Tier + 1;
+
+        Object.Destroy(incoming.gameObject);
+        Object.Destroy(occupant.gameObject);
+        container.Members.Clear();
+
+        Token merged = ContainerManager.Instance.SpawnToken(group, Grid.Instance.CellToWorld(cell));
+        merged.Tier = nextTier;
+        merged.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+        container.TryAccept(merged);
+        return true;
+    }
+}
+
+// Toon Blast-style free rearrangement: dropping onto a different-group occupant swaps the two
+// tokens instead of being rejected, then flood-fills same-group neighbors from both affected
+// cells and clears any run of minMatchSize+ into one grouped output token.
+public class SwapInteraction : IOccupantInteraction
+{
+    readonly Container outputDestination;
+    readonly int minMatchSize;
+
+    public SwapInteraction(Container outputDestination, int minMatchSize = 3)
+    {
+        this.outputDestination = outputDestination;
+        this.minMatchSize = minMatchSize;
+    }
+
+    public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
+    {
+        if (incomingOrigin == null || incomingOrigin == container) return false;
+
+        Vector2Int occupantCell = incomingOrigin.NextAvailableCell();
+        container.TryRemove(occupant);
+        incomingOrigin.TryAccept(occupant);
+        occupant.transform.position = Grid.Instance.CellToWorld(occupantCell);
+
+        container.TryAccept(incoming);
+        incoming.transform.position = Grid.Instance.CellToWorld(container.OrderedCells[0]);
+
+        CheckMatch(container);
+        CheckMatch(incomingOrigin);
+        return true;
+    }
+
+    void CheckMatch(Container cell)
+    {
+        if (cell.Members.Count == 0) return;
+
+        int group = cell.Members[0].Group;
+        var claimed = new HashSet<Container> { cell };
+        var frontier = new List<Container>();
+        AddSameGroupNeighbors(cell, group, claimed, frontier);
+
+        while (frontier.Count > 0)
+        {
+            Container next = frontier[frontier.Count - 1];
+            frontier.RemoveAt(frontier.Count - 1);
+            if (!claimed.Add(next)) continue;
+            AddSameGroupNeighbors(next, group, claimed, frontier);
+        }
+
+        if (claimed.Count < minMatchSize) return;
+
+        foreach (Container matched in claimed)
+        {
+            Token token = matched.Members[0];
+            matched.TryRemove(token);
+            Object.Destroy(token.gameObject);
+        }
+
+        Vector2Int spawnCell = outputDestination.NextAvailableCell();
+        Token grouped = ContainerManager.Instance.SpawnToken(group, Grid.Instance.CellToWorld(spawnCell));
+        grouped.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+        outputDestination.TryAccept(grouped);
+    }
+
+    void AddSameGroupNeighbors(Container from, int group, HashSet<Container> claimed, List<Container> frontier)
+    {
+        foreach (Vector2Int neighborCell in ContainerManager.Instance.Neighbors(from.OrderedCells[0]))
+        {
+            foreach (Container neighbor in ContainerManager.Instance.GetContainersAt(neighborCell))
+            {
+                if (claimed.Contains(neighbor) || neighbor.Members.Count == 0) continue;
+                if (neighbor.Members[0].Group == group) frontier.Add(neighbor);
+            }
         }
     }
 }
