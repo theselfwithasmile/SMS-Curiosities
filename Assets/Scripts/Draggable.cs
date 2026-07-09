@@ -95,43 +95,18 @@ public class Draggable :
 
     // Block Puzzle/Parking Jam-style placement: every offset cell (anchored at the drop cell)
     // must belong to at least one container, and all of them must have room, checked as one
-    // atomic footprint rather than cell by cell. Tracks pending claims per container so two
-    // offset cells landing in the same container (e.g. two cells of one piece in the same
-    // Woodoku row) can't both pass the capacity check against its stale, pre-placement count.
+    // atomic footprint rather than cell by cell.
     void TryPlaceFootprint()
     {
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);
-        var claims = new List<Container>();
-        var pendingCounts = new Dictionary<Container, int>();
-
-        foreach (Vector2Int offset in token.CellOffsets)
+        if (ContainerManager.Instance.TryClaimFootprint(token, anchor, token.CellOffsets))
         {
-            Vector2Int cell = anchor + offset;
-            IReadOnlyList<Container> owners = ContainerManager.Instance.GetContainersAt(cell);
-            if (owners.Count == 0)
-            {
-                RejectFootprint();
-                return;
-            }
-
-            foreach (Container container in owners)
-            {
-                pendingCounts.TryGetValue(container, out int pending);
-                if (container.Members.Count + pending >= container.Capacity || !container.CanAccept(token))
-                {
-                    RejectFootprint();
-                    return;
-                }
-                pendingCounts[container] = pending + 1;
-                claims.Add(container);
-            }
+            transform.position = Grid.Instance.CellToWorld(anchor);
         }
-
-        foreach (Container container in claims)
+        else
         {
-            container.TryAccept(token);
+            RejectFootprint();
         }
-        transform.position = Grid.Instance.CellToWorld(anchor);
     }
 
     void RejectFootprint()

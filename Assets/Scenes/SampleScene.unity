@@ -132,6 +132,7 @@ GameObject:
   m_Component:
   - component: {fileID: 414790132}
   - component: {fileID: 414790131}
+  - component: {fileID: 414790135}
   - component: {fileID: 414790133}
   - component: {fileID: 414790134}
   m_Layer: 0
@@ -158,7 +159,6 @@ MonoBehaviour:
   dotScale: 0.1
   dotColor: {r: 1, g: 1, b: 1, a: 1}
   viewportPadding: 0.05
-  tokenPrefab: {fileID: 7267781291361426296, guid: 2cdcf9fb4a963ef46acbed1a2b005c1e, type: 3}
 --- !u!4 &414790132
 Transform:
   m_ObjectHideFlags: 0
@@ -224,6 +224,19 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &414790135
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 414790130}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2f0b7a85688f1742846b3c345eede4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tokenPrefab: {fileID: 7267781291361426296, guid: 2cdcf9fb4a963ef46acbed1a2b005c1e, type: 3}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -388,6 +401,8 @@ GameObject:
   m_Component:
   - component: {fileID: 571120247}
   - component: {fileID: 571120246}
+  - component: {fileID: 571120248}
+  - component: {fileID: 571120249}
   m_Layer: 0
   m_Name: Water Sort Zone
   m_TagString: Untagged
@@ -402,7 +417,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 571120245}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f523335ec4e724e42848005b5100e0e7, type: 3}
   m_Name: 
@@ -424,6 +439,36 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &571120248
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 571120245}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d744ddc9f99f8a049850c5fd2bfbaf58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  boardSize: 5
+  pieceCount: 3
+  boardColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+--- !u!114 &571120249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 571120245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54935ebaceebd394fa1bce8e72db46d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  blockerCarCount: 3
+  maxGenerationAttempts: 60
+  targetGroup: 0
 --- !u!1 &619394800
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -13,8 +14,6 @@ using UnityEngine.EventSystems;
 // should only ever be placed somewhere its whole lane shares one direction; this component
 // doesn't enforce that itself, it's a generation-time placement rule.
 //
-// Baseline only: doesn't check for/consume an exit-lane Container on arrival, and generation
-// (placing cars, solver-verifying the puzzle is actually solvable) isn't wired up yet.
 [RequireComponent(typeof(Collider2D))]
 [RequireComponent(typeof(Token))]
 public class TapToSlide : MonoBehaviour, IPointerClickHandler
@@ -28,16 +27,26 @@ public class TapToSlide : MonoBehaviour, IPointerClickHandler
         token = GetComponent<Token>();
     }
 
+    // AddComponent can't take constructor args, and the field is serialized/private for the
+    // Inspector case - this is how code-spawned cars (ParkingJamZone) set their fixed direction.
+    public void Initialize(Vector2Int direction)
+    {
+        defaultDirection = direction;
+    }
+
     public void OnPointerClick(PointerEventData eventData)
     {
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);
         FreeFootprint(anchor);
 
-        Vector2Int next = anchor + Grid.Instance.GetFlowDirection(anchor, defaultDirection);
-        while (FootprintFree(next))
+        anchor = SlideUntilBlocked(anchor, a => Grid.Instance.GetFlowDirection(a, defaultDirection), FootprintFree);
+
+        // If the resting cells belong to a real Container (e.g. an exit lane), let it consume
+        // the car via its own rules instead of just parking there - ordinary lane cells have no
+        // Container at all, so this simply falls through to the plain occupancy claim below.
+        if (ContainerManager.Instance.TryClaimFootprint(token, anchor, token.CellOffsets))
         {
-            anchor = next;
-            next = anchor + Grid.Instance.GetFlowDirection(anchor, defaultDirection);
+            return;
         }
 
         ClaimFootprint(anchor);
@@ -68,5 +77,20 @@ public class TapToSlide : MonoBehaviour, IPointerClickHandler
         {
             Grid.Instance.SetOccupied(anchor + offset, true);
         }
+    }
+
+    // Steps in whatever direction directionAt reports at each cell, until anchorFree says the
+    // next step isn't. Shared with ParkingJamZone's solver, which simulates the same stepping
+    // against a hypothetical state instead of real Grid occupancy.
+    public static Vector2Int SlideUntilBlocked(Vector2Int start, Func<Vector2Int, Vector2Int> directionAt, Func<Vector2Int, bool> anchorFree)
+    {
+        Vector2Int anchor = start;
+        Vector2Int next = anchor + directionAt(anchor);
+        while (anchorFree(next))
+        {
+            anchor = next;
+            next = anchor + directionAt(anchor);
+        }
+        return anchor;
     }
 }

@@ -9,6 +9,21 @@ public class GroupMatchConstraint : IEntryConstraint
     }
 }
 
+// Unlike GroupMatchConstraint (matches whatever's already inside), this checks against a fixed
+// expected group regardless of current members - e.g. an exit lane that should only ever
+// consume the one car it's meant for, not whichever car happens to rest there first.
+public class TargetGroupConstraint : IEntryConstraint
+{
+    readonly int group;
+
+    public TargetGroupConstraint(int group)
+    {
+        this.group = group;
+    }
+
+    public bool CanAccept(Token token, Container container) => token.Group == group;
+}
+
 public class FullPredicate : ICompletionPredicate
 {
     public bool IsComplete(Container container) => container.Members.Count >= container.Capacity;
