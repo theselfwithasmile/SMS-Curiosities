@@ -97,6 +97,10 @@ public class ContainerManager : MonoBehaviour
         foreach (Container container in claims)
         {
             container.TryAccept(token);
+        }
+        return true;
+    }
+
     // Claims an exact rectangular region rather than growing randomly - for deliberately placed
     // regions (e.g. the bench) rather than procedurally shaped puzzle containers.
     public Container CreateFixedContainer(RectInt bounds, Color color)

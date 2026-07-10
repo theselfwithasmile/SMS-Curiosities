@@ -9,7 +9,9 @@ public class GameState: MonoBehaviour
     public Vector2 mousePos;
     
     [SerializeField] Color[] groupColors;
-    
+
+    public int GroupCount => groupColors.Length;
+
 
     void Awake()
     {
