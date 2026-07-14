@@ -9,10 +9,17 @@ public class GameState: MonoBehaviour
     public Vector2 mousePos;
     
     [SerializeField] Color[] groupColors;
-
+    static readonly List<Vector2Int>[] Shapes =
+    {
+        new List<Vector2Int> { Vector2Int.zero },
+        new List<Vector2Int> { Vector2Int.zero, Vector2Int.right },
+        new List<Vector2Int> { Vector2Int.zero, Vector2Int.right, Vector2Int.right * 2 },
+        new List<Vector2Int> { Vector2Int.zero, Vector2Int.up, Vector2Int.right },
+        new List<Vector2Int> { Vector2Int.zero, Vector2Int.right, Vector2Int.up, Vector2Int.up + Vector2Int.right },
+    };
+    
     public int GroupCount => groupColors.Length;
-
-
+    
     void Awake()
     {
         Instance = this;

@@ -31,6 +31,16 @@ public interface IOccupantInteraction
     bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container);
 }
 
+// A container computed fresh at the start of one drag gesture and discarded at the end of it
+// (Parking Jam's reachable path), rather than one that persists across the whole game like every
+// other container. BeginGesture runs before the drag's own accept/reject logic; EndGesture runs
+// after, regardless of whether the drop succeeded.
+public interface IEphemeralContainerProvider
+{
+    void BeginGesture(Token token);
+    void EndGesture(Token token);
+}
+
 public class Container
 {
     // Claim order, not just membership, letting tokens stack into the next open slot

@@ -17,9 +17,18 @@ public class Draggable :
     float zDistance;
     bool dragAllowed;
 
+    IEphemeralContainerProvider ephemeralProvider;
+
     void Awake()
     {
         token = GetComponent<Token>();
+    }
+
+    // Optional: a container computed fresh per drag gesture (Parking Jam's reachable path)
+    // instead of the fixed, persistent containers every other zone uses.
+    public void SetEphemeralContainerProvider(IEphemeralContainerProvider provider)
+    {
+        ephemeralProvider = provider;
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -31,6 +40,8 @@ public class Draggable :
         // check) - separate from whether the drop target will accept the token.
         dragAllowed = originalContainer == null || originalContainer.TryRemove(token);
         if (!dragAllowed) return;
+
+        ephemeralProvider?.BeginGesture(token);
 
         Camera camera = EventCamera(eventData);
         zDistance = camera.WorldToScreenPoint(transform.position).z;
@@ -47,9 +58,12 @@ public class Draggable :
     {
         if (!dragAllowed || Grid.Instance == null) return;
 
-        if (token.CellOffsets.Count > 1)
+        // A provider means "place at exactly the drop anchor" (Parking Jam's free positioning
+        // within its path) rather than the stacking behaviour single-cell tokens normally use.
+        if (ephemeralProvider != null || token.CellOffsets.Count > 1)
         {
             TryPlaceFootprint();
+            ephemeralProvider?.EndGesture(token);
             return;
         }
 

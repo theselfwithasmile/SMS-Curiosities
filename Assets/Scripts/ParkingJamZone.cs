@@ -69,10 +69,9 @@ public class ParkingJamZone : MonoBehaviour
         Token token = containers.SpawnMultiCellToken(car.group, worldPosition, car.offsets);
         token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(car.group);
 
-        // Cars are tap-driven, not free-draggable - swap out the prefab's baked-in Draggable.
-        Destroy(token.GetComponent<Draggable>());
-        TapToSlide slider = token.gameObject.AddComponent<TapToSlide>();
-        slider.Initialize(car.direction);
+        // The car keeps its ordinary Draggable - a fresh reachable-path container gets computed
+        // per drag gesture instead of a bespoke tap-and-slide component.
+        token.GetComponent<Draggable>().SetEphemeralContainerProvider(new CarPathProvider(car.direction));
 
         foreach (Vector2Int offset in car.offsets)
         {
@@ -334,7 +333,7 @@ public class ParkingJamZone : MonoBehaviour
     static Vector2Int SimulateSlide(List<CarSpec> cars, Vector2Int[] state, int index, RectInt bounds, HashSet<Vector2Int> staticObstacles)
     {
         Vector2Int direction = cars[index].direction;
-        return TapToSlide.SlideUntilBlocked(state[index], _ => direction, candidate => FootprintFreeInState(cars, state, index, candidate, bounds, staticObstacles));
+        return Grid.SlideUntilBlocked(state[index], _ => direction, candidate => FootprintFreeInState(cars, state, index, candidate, bounds, staticObstacles));
     }
 
     //if the current car is placed here, would it overlap anything

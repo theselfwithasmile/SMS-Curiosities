@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -100,6 +101,21 @@ public class Grid : MonoBehaviour
     public void SetFlowDirection(Vector2Int cell, Vector2Int direction)
     {
         flowDirections[cell] = direction;
+    }
+
+    // Steps in whatever direction directionAt reports at each cell, until anchorFree says the
+    // next step isn't. Shared by real-time movement (a car's own path) and the Parking Jam
+    // solver's simulation, which walks the same stepping against a hypothetical board state.
+    public static Vector2Int SlideUntilBlocked(Vector2Int start, Func<Vector2Int, Vector2Int> directionAt, Func<Vector2Int, bool> anchorFree)
+    {
+        Vector2Int anchor = start;
+        Vector2Int next = anchor + directionAt(anchor);
+        while (anchorFree(next))
+        {
+            anchor = next;
+            next = anchor + directionAt(anchor);
+        }
+        return anchor;
     }
 
     Vector3 CellCenter(int x, int y)

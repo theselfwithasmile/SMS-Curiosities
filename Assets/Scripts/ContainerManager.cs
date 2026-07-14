@@ -66,7 +66,8 @@ public class ContainerManager : MonoBehaviour
     // Checks every offset cell (anchored at a given cell) against all of its owning containers
     // atomically - tracking pending claims per container so two offset cells landing in the same
     // container can't both pass a stale capacity check - then commits via TryAccept if the whole
-    // footprint is legal. Shared by Draggable's multi-cell drop and TapToSlide's exit check.
+    // footprint is legal. Used by Draggable's multi-cell drop (Block Puzzle pieces, and now
+    // Parking Jam cars dropping anywhere within their ephemeral path/exit lane).
     public bool TryClaimFootprint(Token token, Vector2Int anchor, List<Vector2Int> offsets)
     {
         var claims = new List<Container>();

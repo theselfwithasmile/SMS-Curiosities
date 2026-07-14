@@ -184,3 +184,82 @@ public class SwapInteraction : IOccupantInteraction
         }
     }
 }
+
+// Parking Jam (arrow variant), reworked as an ephemeral container instead of a bespoke tap
+// component: at drag-start, computes how far this car could currently slide in its fixed
+// direction (raw Grid occupancy, same as before) and creates a container spanning exactly that
+// reachable strip - CreateFixedContainer already skips cells owned by another container (e.g.
+// an exit lane), so the path naturally stops just short of one, and a drop whose footprint
+// straddles both is still validated atomically by the existing multi-container TryClaimFootprint.
+// The container is discarded at drag-end regardless of outcome; it was only ever a snapshot for
+// that one gesture, recomputed fresh next time this car is grabbed.
+public class CarPathProvider : IEphemeralContainerProvider
+{
+    readonly Vector2Int direction;
+    Container currentPath;
+
+    public CarPathProvider(Vector2Int direction)
+    {
+        this.direction = direction;
+    }
+
+    public void BeginGesture(Token token)
+    {
+        Vector2Int anchor = Grid.Instance.WorldToCell(token.transform.position);
+
+        // Temporarily free the car's own cells so its own footprint doesn't block its own slide.
+        SetOccupied(anchor, token.CellOffsets, false);
+        Vector2Int farAnchor = Grid.SlideUntilBlocked(anchor, _ => direction, candidate => FootprintFree(candidate, token.CellOffsets));
+        SetOccupied(anchor, token.CellOffsets, true);
+
+        RectInt bounds = FootprintSpan(anchor, farAnchor, token.CellOffsets);
+        currentPath = ContainerManager.Instance.CreateFixedContainer(bounds, new Color(1f, 1f, 0.6f, 1f));
+    }
+
+    public void EndGesture(Token token)
+    {
+        if (currentPath != null)
+        {
+            ContainerManager.Instance.RemoveContainer(currentPath);
+            currentPath = null;
+        }
+
+        // RemoveContainer just freed every cell of the (now-discarded) path, including wherever
+        // the token actually ended up - reclaim its own final footprint so other cars still see
+        // it as an obstacle. Skipped if the token was destroyed (it reached a real exit).
+        if (token == null) return;
+
+        Vector2Int restingAnchor = Grid.Instance.WorldToCell(token.transform.position);
+        SetOccupied(restingAnchor, token.CellOffsets, true);
+    }
+
+    static bool FootprintFree(Vector2Int anchor, List<Vector2Int> offsets)
+    {
+        foreach (Vector2Int offset in offsets)
+        {
+            Vector2Int cell = anchor + offset;
+            if (!Grid.Instance.IsInBounds(cell) || Grid.Instance.IsOccupied(cell)) return false;
+        }
+        return true;
+    }
+
+    static void SetOccupied(Vector2Int anchor, List<Vector2Int> offsets, bool occupied)
+    {
+        foreach (Vector2Int offset in offsets)
+        {
+            Grid.Instance.SetOccupied(anchor + offset, occupied);
+        }
+    }
+
+    static RectInt FootprintSpan(Vector2Int nearAnchor, Vector2Int farAnchor, List<Vector2Int> offsets)
+    {
+        Vector2Int min = Vector2Int.Min(nearAnchor, farAnchor);
+        Vector2Int max = Vector2Int.Max(nearAnchor, farAnchor);
+        foreach (Vector2Int offset in offsets)
+        {
+            min = Vector2Int.Min(min, Vector2Int.Min(nearAnchor + offset, farAnchor + offset));
+            max = Vector2Int.Max(max, Vector2Int.Max(nearAnchor + offset, farAnchor + offset));
+        }
+        return new RectInt(min.x, min.y, max.x - min.x + 1, max.y - min.y + 1);
+    }
+}
