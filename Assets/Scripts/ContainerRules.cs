@@ -34,6 +34,32 @@ public class EmptyPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count == 0;
 }
 
+// Merge's win condition can't be "empty" (a merge consumes 2 and produces 1, so a cell never
+// reaches zero occupants on its own) - checked locally per cell instead of globally, since a
+// merge's result is TryAccept-ed back into the same single-cell container that triggered it.
+public class TierReachedPredicate : ICompletionPredicate
+{
+    readonly int targetTier;
+
+    public TierReachedPredicate(int targetTier)
+    {
+        this.targetTier = targetTier;
+    }
+
+    public bool IsComplete(Container container) => container.Members.Count > 0 && container.Members[0].Tier >= targetTier;
+}
+
+public class LogResolution : IResolution
+{
+    public void Resolve(Container container)
+    {
+        if (container.Members.Count > 0)
+        {
+            Debug.Log($"Reached tier {container.Members[0].Tier}!");
+        }
+    }
+}
+
 public class ClearResolution : IResolution
 {
     public void Resolve(Container container)
