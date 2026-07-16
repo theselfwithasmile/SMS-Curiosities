@@ -41,6 +41,7 @@ public interface IEphemeralContainerProvider
     void EndGesture(Token token);
 }
 
+
 public class Container
 {
     // Claim order, not just membership, letting tokens stack into the next open slot
