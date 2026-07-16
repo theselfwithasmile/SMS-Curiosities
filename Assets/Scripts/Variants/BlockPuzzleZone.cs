@@ -23,21 +23,14 @@ public class BlockPuzzleZone : MonoBehaviour
     {
         Grid grid = Grid.Instance;
         ContainerManager containers = ContainerManager.Instance;
-
         int size = Mathf.Min(boardSize, grid.Columns, grid.Rows - 1);
 
-        for (int y = 0; y < size; y++)
+        List<Container> board = new OrthogonalLayout().Build(new RectInt(0, 0, size, size), boardColor);
+        new ContainerRuleSet
         {
-            Container row = containers.CreateFixedContainer(new RectInt(0, y, size, 1), boardColor);
-            row.CompletionPredicate = new FullPredicate();
-            row.Resolution = new ClearResolution();
-        }
-        for (int x = 0; x < size; x++)
-        {
-            Container column = containers.CreateFixedContainer(new RectInt(x, 0, 1, size), boardColor);
-            column.CompletionPredicate = new FullPredicate();
-            column.Resolution = new ClearResolution();
-        }
+            CompletionPredicate = new FullPredicate(),
+            Resolution = new ClearResolution(),
+        }.ApplyToAll(board);
 
         int stagingRow = size;
         int stageX = 0;
@@ -50,8 +43,7 @@ public class BlockPuzzleZone : MonoBehaviour
             if (stageX + width > grid.Columns) break;
 
             Vector3 anchorWorld = grid.CellToWorld(new Vector2Int(stageX, stagingRow));
-            Token piece = containers.SpawnMultiCellToken(group, anchorWorld, shape);
-            piece.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+            containers.SpawnMultiCellToken(group, anchorWorld, shape);
 
             stageX += width + 1;
         }

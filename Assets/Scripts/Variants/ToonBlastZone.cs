@@ -21,64 +21,19 @@ public class ToonBlastZone : MonoBehaviour
 
         Container bench = containers.CreateFixedContainer(new RectInt(0, size, grid.Columns, 1), Color.gray);
 
-        var cells = new List<Container>(size * size);
-        for (int y = 0; y < size; y++)
+        List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, size, size), Color.gray);
+        new ContainerRuleSet
         {
-            for (int x = 0; x < size; x++)
-            {
-                Container cell = containers.CreateFixedContainer(new RectInt(x, y, 1, 1), Color.gray);
-                cell.OccupantInteraction = new SwapInteraction(bench, minMatchSize);
-                cells.Add(cell);
-            }
-        }
+            OccupantInteraction = new SwapInteraction(bench, minMatchSize),
+        }.ApplyToAll(cells);
 
-        List<int> groups = BuildQuotaMatchedGroups(cells.Count);
-        Shuffle(groups);
+        List<int> groups = ContainerManager.BuildQuotaMatchedGroups(cells.Count, groupCount, minMatchSize);
+        ContainerManager.Shuffle(groups);
 
         for (int i = 0; i < cells.Count; i++)
         {
-            int group = groups[i];
-            Token token = containers.SpawnToken(group, grid.CellToWorld(cells[i].OrderedCells[0]));
-            token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+            Token token = containers.SpawnColoredToken(groups[i], grid.CellToWorld(cells[i].OrderedCells[0]));
             cells[i].TryAccept(token);
-        }
-    }
-
-    List<int> BuildQuotaMatchedGroups(int totalCells)
-    {
-        var groups = new List<int>(totalCells);
-        int perGroup = (totalCells / groupCount / minMatchSize) * minMatchSize;
-
-        for (int group = 0; group < groupCount; group++)
-        {
-            for (int i = 0; i < perGroup; i++) groups.Add(group);
-        }
-
-        // Rounding leftovers get distributed as full minMatchSize chunks across random groups,
-        // keeping every group's count a clean multiple so it's guaranteed clearable. Anything
-        // smaller than minMatchSize left after that can't form a guaranteed-clearable group -
-        // folded into an existing group's count as a rare, acceptable straggler cell.
-        int remaining = totalCells - groups.Count;
-        while (remaining >= minMatchSize)
-        {
-            int group = Random.Range(0, groupCount);
-            for (int i = 0; i < minMatchSize; i++) groups.Add(group);
-            remaining -= minMatchSize;
-        }
-        for (int i = 0; i < remaining; i++)
-        {
-            groups.Add(Random.Range(0, groupCount));
-        }
-
-        return groups;
-    }
-
-    static void Shuffle(List<int> list)
-    {
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
         }
     }
 }

@@ -11,53 +11,32 @@ public class WaterSortZone : MonoBehaviour
         Grid grid = Grid.Instance;
         ContainerManager containers = ContainerManager.Instance;
 
-        //generate bench
         int totalTokens = tubeCount * tubeCapacity;
         int benchRows = Mathf.Max(1, Mathf.CeilToInt(totalTokens / (float)grid.Columns));
         Container bench = containers.CreateFixedContainer(new RectInt(0, 0, grid.Columns, benchRows), Color.gray);
 
-        //generate containers
+        var tubeLayout = new RegionGrowthLayout(tubeCapacity, Vector2Int.up, 1f);
         var tubes = new List<Container>();
         for (int group = 0; group < tubeCount; group++)
         {
-            Container tube = containers.GenerateContainer(tubeCapacity, GameState.Instance.GroupColor(group), Vector2Int.up, 1f);
-            if (tube == null) continue;
-
-            //enforce containers rules
-            tube.EntryConstraints.Add(new GroupMatchConstraint());
-            tube.CompletionPredicate = new FullPredicate();
-            tube.Resolution = new SpawnTokenResolution(bench);
-
-            tubes.Add(tube);
+            tubes.AddRange(tubeLayout.Build(default, GameState.Instance.GroupColor(group)));
         }
 
-        //generate token groups
-        var groups = new List<int>();
-        for (int group = 0; group < tubes.Count; group++)
+        new ContainerRuleSet
         {
-            for (int i = 0; i < tubeCapacity; i++)
-            {
-                groups.Add(group);
-            }
-        }
-        Shuffle(groups);
+            EntryConstraint = new GroupMatchConstraint(),
+            CompletionPredicate = new FullPredicate(),
+            Resolution = new SpawnTokenResolution(bench),
+        }.ApplyToAll(tubes);
 
-        //generate each group's tokens to be placed on the bench
+        List<int> groups = ContainerManager.BuildQuotaMatchedGroups(tubes.Count * tubeCapacity, tubes.Count, tubeCapacity);
+        ContainerManager.Shuffle(groups);
+
         foreach (int group in groups)
         {
             Vector2Int cell = bench.NextAvailableCell();
-            Token token = containers.SpawnToken(group, grid.CellToWorld(cell));
-            token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+            Token token = containers.SpawnColoredToken(group, grid.CellToWorld(cell));
             bench.TryAccept(token);
-        }
-    }
-
-    static void Shuffle(List<int> list)
-    {
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
         }
     }
 }

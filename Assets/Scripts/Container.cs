@@ -42,6 +42,33 @@ public interface IEphemeralContainerProvider
 }
 
 
+// Bundles the four pluggable rule slots so a zone can wire them onto many containers in one call
+// instead of four separate property assignments per container. Rule instances here are almost
+// always stateless (or share the same constructor args) across every container in a zone, so one
+// ContainerRuleSet is normally shared, not rebuilt per container.
+public class ContainerRuleSet
+{
+    public IEntryConstraint EntryConstraint;
+    public IExitConstraint ExitConstraint;
+    public ICompletionPredicate CompletionPredicate;
+    public IResolution Resolution;
+    public IOccupantInteraction OccupantInteraction;
+
+    public void ApplyTo(Container container)
+    {
+        if (EntryConstraint != null) container.EntryConstraints.Add(EntryConstraint);
+        if (ExitConstraint != null) container.ExitConstraints.Add(ExitConstraint);
+        if (CompletionPredicate != null) container.CompletionPredicate = CompletionPredicate;
+        if (Resolution != null) container.Resolution = Resolution;
+        if (OccupantInteraction != null) container.OccupantInteraction = OccupantInteraction;
+    }
+
+    public void ApplyToAll(IEnumerable<Container> containers)
+    {
+        foreach (Container container in containers) ApplyTo(container);
+    }
+}
+
 public class Container
 {
     // Claim order, not just membership, letting tokens stack into the next open slot

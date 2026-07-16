@@ -50,9 +50,12 @@ public class ParkingJamZone : MonoBehaviour
 
         RectInt exitBounds = FootprintBounds(exitAnchor, layout[0].offsets);
         Container exitLane = containers.CreateFixedContainer(exitBounds, GameState.Instance.GroupColor(targetGroup));
-        exitLane.EntryConstraints.Add(new TargetGroupConstraint(targetGroup));
-        exitLane.CompletionPredicate = new FullPredicate();
-        exitLane.Resolution = new ClearResolution();
+        new ContainerRuleSet
+        {
+            EntryConstraint = new TargetGroupConstraint(targetGroup),
+            CompletionPredicate = new FullPredicate(),
+            Resolution = new ClearResolution(),
+        }.ApplyTo(exitLane);
 
         foreach (CarSpec car in layout)
         {
@@ -67,7 +70,6 @@ public class ParkingJamZone : MonoBehaviour
 
         Vector3 worldPosition = grid.CellToWorld(car.anchor);
         Token token = containers.SpawnMultiCellToken(car.group, worldPosition, car.offsets);
-        token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(car.group);
 
         // The car keeps its ordinary Draggable - a fresh reachable-path container gets computed
         // per drag gesture instead of a bespoke tap-and-slide component.
@@ -109,7 +111,7 @@ public class ParkingJamZone : MonoBehaviour
                 if (!occupied.Contains(cell)) freeCells.Add(cell);
             }
         }
-        Shuffle(freeCells);
+        ContainerManager.Shuffle(freeCells);
 
         
         //generates blockers on free cells
@@ -161,7 +163,7 @@ public class ParkingJamZone : MonoBehaviour
             combos.Add((false, length, Vector2Int.up));
             combos.Add((false, length, Vector2Int.down));
         }
-        Shuffle(combos);
+        ContainerManager.Shuffle(combos);
 
         int groupRange = Mathf.Max(2, GameState.Instance.GroupCount);
         foreach ((bool horizontal, int length, Vector2Int direction) in combos)
@@ -211,15 +213,6 @@ public class ParkingJamZone : MonoBehaviour
         var offsets = new List<Vector2Int>(length);
         for (int i = 0; i < length; i++) offsets.Add(new Vector2Int(0, i));
         return offsets;
-    }
-
-    static void Shuffle<T>(List<T> list)
-    {
-        for (int i = list.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
     }
 
     // The joint state is every relevant car's position, so cost is combinatorial in car count -

@@ -39,13 +39,65 @@ public class ContainerManager : MonoBehaviour
         return token;
     }
 
+    // Every zone spawns a token and immediately applies its group color the same way - this was
+    // duplicated line-for-line in all five.
+    public Token SpawnColoredToken(int group, Vector3 worldPosition)
+    {
+        Token token = SpawnToken(group, worldPosition);
+        token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+        return token;
+    }
+
+    // Partitions totalCount into groupCount buckets, each a multiple of chunkSize, so a zone
+    // built from the result is guaranteed fully clearable/fillable by construction (Water Sort's
+    // per-tube supply, Toon Blast's per-group cell counts - same operation, different chunk size).
+    public static List<int> BuildQuotaMatchedGroups(int totalCount, int groupCount, int chunkSize)
+    {
+        var groups = new List<int>(totalCount);
+        int perGroup = (totalCount / groupCount / chunkSize) * chunkSize;
+
+        for (int group = 0; group < groupCount; group++)
+        {
+            for (int i = 0; i < perGroup; i++) groups.Add(group);
+        }
+
+        // Rounding leftovers get distributed as full chunks across random groups, keeping every
+        // group's count a clean multiple. Anything smaller than chunkSize left after that can't
+        // form a guaranteed-complete group - folded in as a rare, acceptable straggler.
+        int remaining = totalCount - groups.Count;
+        while (remaining >= chunkSize)
+        {
+            int group = Random.Range(0, groupCount);
+            for (int i = 0; i < chunkSize; i++) groups.Add(group);
+            remaining -= chunkSize;
+        }
+        for (int i = 0; i < remaining; i++)
+        {
+            groups.Add(Random.Range(0, groupCount));
+        }
+
+        return groups;
+    }
+
+    public static void Shuffle<T>(List<T> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (list[i], list[j]) = (list[j], list[i]);
+        }
+    }
+
     // Multi-cell pieces (Block Puzzle, Parking Jam) are still one Token with a longer
     // CellOffsets list - the extra cells just need a visual, so this bolts on a plain child
     // sprite per extra offset (reusing the base token's sprite/color), parented with
     // worldPositionStays so it lands correctly regardless of the prefab's own nested scale.
+    // Uses SpawnColoredToken (not the raw SpawnToken) specifically so the base sprite already has
+    // its correct color before children copy it - spawning uncolored here would let children copy
+    // Token.Awake()'s stale Group-0 color, since .Group isn't assigned until after Instantiate.
     public Token SpawnMultiCellToken(int group, Vector3 anchorWorldPosition, List<Vector2Int> offsets)
     {
-        Token token = SpawnToken(group, anchorWorldPosition);
+        Token token = SpawnColoredToken(group, anchorWorldPosition);
         token.CellOffsets = new List<Vector2Int>(offsets);
 
         SpriteRenderer baseRenderer = token.GetComponent<SpriteRenderer>();
