@@ -106,6 +106,18 @@ public class Container
         return true;
     }
 
+    // Re-adds a token unconditionally, bypassing entry constraints entirely - used only to revert
+    // a token to wherever it just came from after a failed drag. Reverting should never be
+    // gate-kept by rules meant for genuinely new placements (NoEntryConstraint, for instance,
+    // would otherwise also block a token from returning to the exact container it left moments
+    // ago). Never trips completion either - the container's state is exactly what it was before
+    // the drag started, which by definition wasn't already complete.
+    public void ForceAccept(Token token)
+    {
+        Members.Add(token);
+        token.CurrentContainer = this;
+    }
+
     public bool TryAccept(Token token)
     {
         if (!CanAccept(token)) return false;

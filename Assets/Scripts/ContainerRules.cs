@@ -9,6 +9,16 @@ public class GroupMatchConstraint : IEntryConstraint
     }
 }
 
+// Blocks all normal entry - for cells that should only ever be seeded once at generation
+// (bypassing TryAccept directly) and afterward only lose tokens via an occupant interaction,
+// never gain one via an ordinary drag onto an empty cell (Tile Connect: without this, a player
+// could freely relocate tiles into empty cells to manufacture connections that don't naturally
+// exist, collapsing the puzzle into free rearrangement).
+public class NoEntryConstraint : IEntryConstraint
+{
+    public bool CanAccept(Token token, Container container) => false;
+}
+
 // Unlike GroupMatchConstraint (matches whatever's already inside), this checks against a fixed
 // expected group regardless of current members - e.g. an exit lane that should only ever
 // consume the one car it's meant for, not whichever car happens to rest there first.
@@ -205,6 +215,56 @@ public class SwapInteraction : IOccupantInteraction
                 if (neighbor.Members[0].Group == group) frontier.Add(neighbor);
             }
         }
+    }
+}
+
+// Tile Connect (simplified - no turn limit, deferred for later): dropping a token onto a
+// same-group occupant clears both if a collision-free route exists between the token's origin
+// cell and the occupant's cell, walking through any cell with no container (the outer routing
+// margin) or an empty one (a cell whose tile has already been cleared).
+public class PathConnectInteraction : IOccupantInteraction
+{
+    public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
+    {
+        if (incoming.Group != occupant.Group || incomingOrigin == null) return false;
+
+        Vector2Int origin = incomingOrigin.OrderedCells[0];
+        Vector2Int target = container.OrderedCells[0];
+        if (!IsReachable(origin, target)) return false;
+
+        container.TryRemove(occupant);
+        Object.Destroy(occupant.gameObject);
+        Object.Destroy(incoming.gameObject);
+        return true;
+    }
+
+    static bool IsReachable(Vector2Int origin, Vector2Int target)
+    {
+        var visited = new HashSet<Vector2Int> { origin };
+        var frontier = new Queue<Vector2Int>();
+        frontier.Enqueue(origin);
+
+        while (frontier.Count > 0)
+        {
+            Vector2Int cell = frontier.Dequeue();
+            foreach (Vector2Int neighbor in ContainerManager.Instance.Neighbors(cell))
+            {
+                if (neighbor == target) return true;
+                if (visited.Contains(neighbor) || !IsPassable(neighbor)) continue;
+                visited.Add(neighbor);
+                frontier.Enqueue(neighbor);
+            }
+        }
+        return false;
+    }
+
+    static bool IsPassable(Vector2Int cell)
+    {
+        foreach (Container container in ContainerManager.Instance.GetContainersAt(cell))
+        {
+            if (container.Members.Count > 0) return false;
+        }
+        return true;
     }
 }
 

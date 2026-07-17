@@ -85,7 +85,7 @@ public class Draggable :
         else
         {
             transform.position = originalPosition;
-            originalContainer?.TryAccept(token);
+            originalContainer?.ForceAccept(token);
         }
     }
 
@@ -126,7 +126,7 @@ public class Draggable :
     void RejectFootprint()
     {
         transform.position = originalPosition;
-        originalContainer?.TryAccept(token);
+        originalContainer?.ForceAccept(token);
     }
 
     Vector3 PointerToWorld(PointerEventData eventData, Camera camera)

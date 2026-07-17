@@ -32,6 +32,7 @@ public class BlockPuzzleZone : MonoBehaviour
             Resolution = new ClearResolution(),
         }.ApplyToAll(board);
 
+        
         int stagingRow = size;
         int stageX = 0;
         for (int i = 0; i < pieceCount; i++)
