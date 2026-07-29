@@ -69,7 +69,7 @@ public class ParkingJamZone : MonoBehaviour
         ContainerManager containers = ContainerManager.Instance;
 
         Vector3 worldPosition = grid.CellToWorld(car.anchor);
-        Token token = containers.SpawnMultiCellToken(car.group, worldPosition, car.offsets);
+        Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, worldPosition, car.offsets);
 
         // The car keeps its ordinary Draggable - a fresh reachable-path container gets computed
         // per drag gesture instead of a bespoke tap-and-slide component.

@@ -32,7 +32,7 @@ public class ToonBlastZone : MonoBehaviour
 
         for (int i = 0; i < cells.Count; i++)
         {
-            Token token = containers.SpawnColoredToken(groups[i], grid.CellToWorld(cells[i].OrderedCells[0]));
+            Token token = TokenSpawner.Instance.SpawnColoredToken(groups[i], grid.CellToWorld(cells[i].OrderedCells[0]));
             cells[i].TryAccept(token);
         }
     }

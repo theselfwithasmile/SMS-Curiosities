@@ -32,7 +32,7 @@ public class MergeZone : MonoBehaviour
         {
             Container cell = cells[i];
             int group = Random.Range(0, groupCount);
-            Token token = containers.SpawnColoredToken(group, grid.CellToWorld(cell.OrderedCells[0]));
+            Token token = TokenSpawner.Instance.SpawnColoredToken(group, grid.CellToWorld(cell.OrderedCells[0]));
             cell.TryAccept(token);
         }
     }

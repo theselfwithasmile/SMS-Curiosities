@@ -110,7 +110,7 @@ public class SpawnTokenResolution : IResolution
         Vector2Int spawnCell = destination.Members.Count < destination.Capacity
             ? destination.NextAvailableCell()
             : container.NextAvailableCell();
-        Token grouped = ContainerManager.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
+        Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
         destination.TryAccept(grouped);
 
         if (consumeContainer)
@@ -136,7 +136,7 @@ public class MergeInteraction : IOccupantInteraction
         Object.Destroy(occupant.gameObject);
         container.Members.Clear();
 
-        Token merged = ContainerManager.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(cell));
+        Token merged = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(cell));
         merged.Tier = nextTier;
         container.TryAccept(merged);
         return true;
@@ -201,7 +201,7 @@ public class SwapInteraction : IOccupantInteraction
         }
 
         Vector2Int spawnCell = outputDestination.NextAvailableCell();
-        Token grouped = ContainerManager.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
+        Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
         outputDestination.TryAccept(grouped);
     }
 

@@ -113,7 +113,7 @@ public class Draggable :
     void TryPlaceFootprint()
     {
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);
-        if (ContainerManager.Instance.TryClaimFootprint(token, anchor, token.CellOffsets))
+        if (TokenSpawner.Instance.TryClaimFootprint(token, anchor, token.CellOffsets))
         {
             transform.position = Grid.Instance.CellToWorld(anchor);
         }

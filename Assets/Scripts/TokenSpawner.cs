@@ -4,7 +4,13 @@ using UnityEngine;
 
 public class TokenSpawner : MonoBehaviour
 {
+    public static TokenSpawner Instance;
     [SerializeField] private Token tokenPrefab;
+    
+    void Awake()
+    {
+        Instance = this;
+    }
     
     public Token SpawnToken(int group, Vector3 worldPosition)
     {
@@ -62,7 +68,7 @@ public class TokenSpawner : MonoBehaviour
         foreach (Vector2Int offset in offsets)
         {
             Vector2Int cell = anchor + offset;
-            IReadOnlyList<Container> owners = GetContainersAt(cell);
+            IReadOnlyList<Container> owners = ContainerManager.Instance.GetContainersAt(cell);
             if (owners.Count == 0) return false;
 
             foreach (Container container in owners)

@@ -24,6 +24,7 @@ public class TileConnectZone : MonoBehaviour
         Grid grid = Grid.Instance;
         ContainerManager containers = ContainerManager.Instance;
 
+		//leave the outermost grid layers to be empty to create room for dragging(?)
         int fieldWidth = Mathf.Max(2, grid.Columns - margin * 2);
         int fieldHeight = Mathf.Max(2, grid.Rows - margin * 2);
         if ((fieldWidth * fieldHeight) % 2 != 0) fieldWidth -= 1; // needs an even cell count to pair fully

@@ -35,7 +35,7 @@ public class WaterSortZone : MonoBehaviour
         foreach (int group in groups)
         {
             Vector2Int cell = bench.NextAvailableCell();
-            Token token = containers.SpawnColoredToken(group, grid.CellToWorld(cell));
+            Token token = TokenSpawner.Instance.SpawnColoredToken(group, grid.CellToWorld(cell));
             bench.TryAccept(token);
         }
     }

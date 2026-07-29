@@ -44,7 +44,7 @@ public class BlockPuzzleZone : MonoBehaviour
             if (stageX + width > grid.Columns) break;
 
             Vector3 anchorWorld = grid.CellToWorld(new Vector2Int(stageX, stagingRow));
-            containers.SpawnMultiCellToken(group, anchorWorld, shape);
+            TokenSpawner.Instance.SpawnMultiCellToken(group, anchorWorld, shape);
 
             stageX += width + 1;
         }
