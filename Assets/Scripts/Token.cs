@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 // Token absorbs what used to be a separate Draggable component - every token that exists is
-// draggable, and the only remaining per-variant differences (CellOffsets, FixedDirection) are
-// plain data rather than a pluggable strategy object, so there was never a real reason to keep
-// the drag verb as a component of its own.
+// draggable, and the only remaining per-variant differences (CellOffsets, EscapeLane) are plain
+// data rather than a pluggable strategy object, so there was never a real reason to keep the drag
+// verb as a component of its own.
 [RequireComponent(typeof(Collider2D))]
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
@@ -19,10 +19,12 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // since they're parented under this Transform.
     public List<Vector2Int> CellOffsets = new List<Vector2Int> { Vector2Int.zero };
 
-    // Arrow/Parking Jam: a fixed slide direction set at spawn. Non-null means drag-end resolves
-    // via ResolveFixedDirectionDrag (fully escape or fully revert) instead of ordinary container
-    // placement - the car either clears all the way to the grid edge or never actually moves.
-    public Vector2Int? FixedDirection;
+    // Arrow/Parking Jam: the fixed corridor (absolute cells, beyond the body) leading from this
+    // token's head to the grid boundary, baked in at spawn. Non-null means drag-end resolves via
+    // ResolveEscapeDrag (fully escape or fully revert) instead of ordinary container placement -
+    // the piece's own body never partially moves, so all that matters is whether every lane cell
+    // is currently free of every other still-present piece.
+    public List<Vector2Int> EscapeLane;
 
     Vector3 pointerOffset;
     Vector3 originalPosition;
@@ -60,9 +62,9 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         if (!dragAllowed || Grid.Instance == null) return;
 
-        if (FixedDirection.HasValue)
+        if (EscapeLane != null)
         {
-            ResolveFixedDirectionDrag();
+            ResolveEscapeDrag();
             return;
         }
 
@@ -96,48 +98,25 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
     }
 
-    // Every car either clears all the way to the grid boundary or doesn't move at all - no
-    // intermediate resting position is ever kept, since a car that doesn't fully escape never
-    // actually changes the board. Compares the maximal slide against other cars with the maximal
-    // slide against the boundary alone: if they land on the same cell, nothing but the edge
-    // stopped it, so it escapes; if another car stopped it earlier, it reverts.
-    void ResolveFixedDirectionDrag()
+    // The body never partially moves - it either escapes whole or reverts whole. Since the lane is
+    // baked in at spawn as exactly the cells beyond the head that need to be clear, checking
+    // escape is just "is every one of those currently free of other still-present pieces" - no
+    // slide simulation needed at all.
+    void ResolveEscapeDrag()
     {
-        Vector2Int direction = FixedDirection.Value;
+        foreach (Vector2Int cell in EscapeLane)
+        {
+            if (Grid.Instance.IsOccupied(cell))
+            {
+                transform.position = originalPosition;
+                originalContainer?.ForceAccept(this);
+                return;
+            }
+        }
+
         Vector2Int anchor = Grid.Instance.WorldToCell(originalPosition);
-
         SetFootprintOccupied(anchor, false);
-        Vector2Int withObstacles = Grid.SlideUntilBlocked(anchor, _ => direction, c => FootprintFree(c));
-        Vector2Int boundsOnly = Grid.SlideUntilBlocked(anchor, _ => direction, c => FootprintFitsBounds(c));
-
-        if (withObstacles == boundsOnly)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        SetFootprintOccupied(anchor, true);
-        transform.position = originalPosition;
-        originalContainer?.ForceAccept(this);
-    }
-
-    bool FootprintFree(Vector2Int anchor)
-    {
-        foreach (Vector2Int offset in CellOffsets)
-        {
-            Vector2Int cell = anchor + offset;
-            if (!Grid.Instance.IsInBounds(cell) || Grid.Instance.IsOccupied(cell)) return false;
-        }
-        return true;
-    }
-
-    bool FootprintFitsBounds(Vector2Int anchor)
-    {
-        foreach (Vector2Int offset in CellOffsets)
-        {
-            if (!Grid.Instance.IsInBounds(anchor + offset)) return false;
-        }
-        return true;
+        Destroy(gameObject);
     }
 
     void SetFootprintOccupied(Vector2Int anchor, bool occupied)
