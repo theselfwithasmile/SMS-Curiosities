@@ -1,10 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-// What containers exist when a zone starts - called once, upfront, from a zone's Start(). This
-// is deliberately separate from IEphemeralContainerProvider: that computes one container live,
-// mid-game, per drag gesture, triggered by player input - a different lifecycle and caller
-// entirely, not just a variant of "how do I carve up the board."
+// What containers exist when a zone starts - called once, upfront, from a zone's Start().
 public interface IContainerLayout
 {
     List<Container> Build(RectInt bounds, Color color);

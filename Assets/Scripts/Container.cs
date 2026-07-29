@@ -31,17 +31,6 @@ public interface IOccupantInteraction
     bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container);
 }
 
-// A container computed fresh at the start of one drag gesture and discarded at the end of it
-// (Parking Jam's reachable path), rather than one that persists across the whole game like every
-// other container. BeginGesture runs before the drag's own accept/reject logic; EndGesture runs
-// after, regardless of whether the drop succeeded.
-public interface IEphemeralContainerProvider
-{
-    void BeginGesture(Token token);
-    void EndGesture(Token token);
-}
-
-
 // Bundles the four pluggable rule slots so a zone can wire them onto many containers in one call
 // instead of four separate property assignments per container. Rule instances here are almost
 // always stateless (or share the same constructor args) across every container in a zone, so one
@@ -133,7 +122,7 @@ public class Container
         return true;
     }
 
-    // Only tried by Draggable when CanAccept fails due to capacity, not due to an entry
+    // Only tried by Token when CanAccept fails due to capacity, not due to an entry
     // constraint rejecting the token outright.
     public bool TryInteractWithOccupant(Token incoming, Container incomingOrigin)
     {

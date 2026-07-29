@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 3600385993183274557}
   - component: {fileID: 2283326108379589287}
   - component: {fileID: 2936437906640447548}
-  - component: {fileID: 2345928102576521265}
   - component: {fileID: 7267781291361426296}
   m_Layer: 0
   m_Name: Token
@@ -132,18 +131,6 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 0.1469294, y: 0.14615256}
   m_EdgeRadius: 0
---- !u!114 &2345928102576521265
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7986215222390902657}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a06c09dfd84248b4989beccc120fafa2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &7267781291361426296
 MonoBehaviour:
   m_ObjectHideFlags: 0

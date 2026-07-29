@@ -1,16 +1,17 @@
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 
-// Parking Jam (arrow variant): a target car must reach a matching exit lane by tapping cars in
-// the right order - each car's direction is fixed at generation time, never player-chosen.
-// Generation retries random layouts until a BFS solver over car positions confirms the target
-// can actually escape, so every generated puzzle is guaranteed solvable.
+// Parking Jam (arrow-maze variant): every car has its own fixed slide direction and its own exit
+// - the grid boundary in that direction - rather than one target car chasing a shared exit lane.
+// A drag either clears a car all the way to the boundary or reverts it completely (Token's
+// FixedDirection path handles this at drag-end); no intermediate resting position ever persists,
+// so the whole layout is monotone: a car that currently has a clear run to the edge will always
+// still have one later (nothing ever repositions to block it), which is exactly why solvability
+// only needs a simple greedy check instead of a BFS over joint car positions.
 public class ParkingJamZone : MonoBehaviour
 {
     [SerializeField, Range(0f, 1f)] float fillRatio = 0.55f;
     [SerializeField] int maxGenerationAttempts = 60;
-    [SerializeField] int targetGroup = 0;
 
     struct CarSpec
     {
@@ -23,39 +24,24 @@ public class ParkingJamZone : MonoBehaviour
     void Start()
     {
         Grid grid = Grid.Instance;
-        ContainerManager containers = ContainerManager.Instance;
         var bounds = new RectInt(0, 0, grid.Columns, grid.Rows);
 
         List<CarSpec> layout = null;
-        
-        Vector2Int exitAnchor = default; //exit anchor is the anchor of the target car, which is also the exit lane's anchor
-
         for (int attempt = 0; attempt < maxGenerationAttempts; attempt++)
         {
-            List<CarSpec> candidate = GenerateLayout(bounds, out Vector2Int candidateExit);
-            if (candidate != null && IsSolvable(candidate, bounds, candidateExit))
+            List<CarSpec> candidate = GenerateLayout(bounds);
+            if (candidate != null && IsSolvable(candidate, bounds))
             {
                 layout = candidate;
-                exitAnchor = candidateExit;
                 break;
             }
         }
 
         if (layout == null)
         {
-            Debug.LogWarning("ParkingJamZone: no solvable layout found within the attempt budget; falling back to just the target car.");
-            CarSpec target = CreateRandomTarget(bounds, out exitAnchor);
-            layout = new List<CarSpec> { target };
+            Debug.LogWarning("ParkingJamZone: no solvable layout found within the attempt budget; falling back to an empty board.");
+            layout = new List<CarSpec>();
         }
-
-        RectInt exitBounds = FootprintBounds(exitAnchor, layout[0].offsets);
-        Container exitLane = containers.CreateFixedContainer(exitBounds, GameState.Instance.GroupColor(targetGroup));
-        new ContainerRuleSet
-        {
-            EntryConstraint = new TargetGroupConstraint(targetGroup),
-            CompletionPredicate = new FullPredicate(),
-            Resolution = new ClearResolution(),
-        }.ApplyTo(exitLane);
 
         foreach (CarSpec car in layout)
         {
@@ -66,14 +52,9 @@ public class ParkingJamZone : MonoBehaviour
     void SpawnCar(CarSpec car)
     {
         Grid grid = Grid.Instance;
-        ContainerManager containers = ContainerManager.Instance;
-
         Vector3 worldPosition = grid.CellToWorld(car.anchor);
         Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, worldPosition, car.offsets);
-
-        // The car keeps its ordinary Draggable - a fresh reachable-path container gets computed
-        // per drag gesture instead of a bespoke tap-and-slide component.
-        token.GetComponent<Draggable>().SetEphemeralContainerProvider(new CarPathProvider(car.direction));
+        token.FixedDirection = car.direction;
 
         foreach (Vector2Int offset in car.offsets)
         {
@@ -81,79 +62,41 @@ public class ParkingJamZone : MonoBehaviour
         }
     }
 
-    // Places a randomly shaped/positioned target first, then fills free cells (in random order)
-    // with random cars until roughly fillRatio of the board is occupied - walking actual
-    // remaining free cells rather than blind-guessing coordinates, so density scales reliably
-    // instead of degrading as the board fills up.
-    List<CarSpec> GenerateLayout(RectInt bounds, out Vector2Int exitAnchor)
+    // Fills free cells (in random order) with random cars until roughly fillRatio of the board is
+    // occupied - walking actual remaining free cells rather than blind-guessing coordinates, so
+    // density scales reliably instead of degrading as the board fills up.
+    List<CarSpec> GenerateLayout(RectInt bounds)
     {
         var cars = new List<CarSpec>();
         var occupied = new HashSet<Vector2Int>();
         int targetFilled = Mathf.RoundToInt(fillRatio * bounds.width * bounds.height);
 
-        //find target
-        CarSpec target = CreateRandomTarget(bounds, out exitAnchor);
-        if (!TryClaim(target, bounds, occupied))
-        {
-            exitAnchor = default;
-            return null;
-        }
-        cars.Add(target);
-        
-        
-        //find free cells and shuffle them
         var freeCells = new List<Vector2Int>();
         for (int y = bounds.yMin; y < bounds.yMax; y++)
         {
             for (int x = bounds.xMin; x < bounds.xMax; x++)
             {
-                var cell = new Vector2Int(x, y);
-                if (!occupied.Contains(cell)) freeCells.Add(cell);
+                freeCells.Add(new Vector2Int(x, y));
             }
         }
         ContainerManager.Shuffle(freeCells);
 
-        
-        //generates blockers on free cells
         foreach (Vector2Int cell in freeCells)
         {
             if (occupied.Count >= targetFilled) break;
             if (occupied.Contains(cell)) continue;
 
-            CarSpec? blocker = TryBuildBlockerAt(cell, bounds, occupied);
-            if (blocker.HasValue) cars.Add(blocker.Value);
+            CarSpec? car = TryBuildCarAt(cell, bounds, occupied);
+            if (car.HasValue) cars.Add(car.Value);
         }
 
-        return cars;
-    }
-
-    CarSpec CreateRandomTarget(RectInt bounds, out Vector2Int exitAnchor)
-    {
-        int length = Random.Range(2, 4);
-        bool horizontal = Random.value < 0.5f;
-
-        if (horizontal)
-        {
-            int row = Random.Range(bounds.yMin, bounds.yMax);
-            bool exitsRight = Random.value < 0.5f;
-            Vector2Int direction = exitsRight ? Vector2Int.right : Vector2Int.left;
-            Vector2Int start = exitsRight ? new Vector2Int(bounds.xMin, row) : new Vector2Int(bounds.xMax - length, row);
-            exitAnchor = exitsRight ? new Vector2Int(bounds.xMax - length, row) : new Vector2Int(bounds.xMin, row);
-            return new CarSpec { anchor = start, direction = direction, offsets = StraightOffsets(length), group = targetGroup };
-        }
-
-        int column = Random.Range(bounds.xMin, bounds.xMax);
-        bool exitsUp = Random.value < 0.5f;
-        Vector2Int verticalDirection = exitsUp ? Vector2Int.up : Vector2Int.down;
-        Vector2Int verticalStart = exitsUp ? new Vector2Int(column, bounds.yMin) : new Vector2Int(column, bounds.yMax - length);
-        exitAnchor = exitsUp ? new Vector2Int(column, bounds.yMax - length) : new Vector2Int(column, bounds.yMin);
-        return new CarSpec { anchor = verticalStart, direction = verticalDirection, offsets = StraightOffsetsVertical(length), group = targetGroup };
+        return cars.Count > 0 ? cars : null;
     }
 
     // Tries a shuffled set of (orientation, length, direction) combos anchored at this specific
     // free cell, keeping the first that fits - maximizes the chance of successfully packing a
     // car at any given spot rather than failing the whole cell on one fixed shape.
-    static CarSpec? TryBuildBlockerAt(Vector2Int cell, RectInt bounds, HashSet<Vector2Int> occupied)
+    static CarSpec? TryBuildCarAt(Vector2Int cell, RectInt bounds, HashSet<Vector2Int> occupied)
     {
         var combos = new List<(bool horizontal, int length, Vector2Int direction)>();
         for (int length = 1; length <= 3; length++)
@@ -165,11 +108,11 @@ public class ParkingJamZone : MonoBehaviour
         }
         ContainerManager.Shuffle(combos);
 
-        int groupRange = Mathf.Max(2, GameState.Instance.GroupCount);
+        int groupRange = Mathf.Max(1, GameState.Instance.GroupCount);
         foreach ((bool horizontal, int length, Vector2Int direction) in combos)
         {
             List<Vector2Int> offsets = horizontal ? StraightOffsets(length) : StraightOffsetsVertical(length);
-            var car = new CarSpec { anchor = cell, direction = direction, offsets = offsets, group = Random.Range(1, groupRange) };
+            var car = new CarSpec { anchor = cell, direction = direction, offsets = offsets, group = Random.Range(0, groupRange) };
             if (TryClaim(car, bounds, occupied)) return car;
         }
         return null;
@@ -188,19 +131,6 @@ public class ParkingJamZone : MonoBehaviour
         return true;
     }
 
-    static RectInt FootprintBounds(Vector2Int anchor, List<Vector2Int> offsets)
-    {
-        Vector2Int min = anchor + offsets[0];
-        Vector2Int max = min;
-        foreach (Vector2Int offset in offsets)
-        {
-            Vector2Int cell = anchor + offset;
-            min = Vector2Int.Min(min, cell);
-            max = Vector2Int.Max(max, cell);
-        }
-        return new RectInt(min.x, min.y, max.x - min.x + 1, max.y - min.y + 1);
-    }
-
     static List<Vector2Int> StraightOffsets(int length)
     {
         var offsets = new List<Vector2Int>(length);
@@ -215,148 +145,66 @@ public class ParkingJamZone : MonoBehaviour
         return offsets;
     }
 
-    // The joint state is every relevant car's position, so cost is combinatorial in car count -
-    // fine for a handful of cars, but a dense fillRatio board can easily have 15+ cars, which
-    // blows up even though each car's own position range is small. Most of those cars are
-    // parked somewhere the target's path never touches, so they're pruned to static obstacles
-    // before the BFS ever runs, via ComputeRelevantCars below.
-    static bool IsSolvable(List<CarSpec> allCars, RectInt bounds, Vector2Int exitAnchor)
+    // Monotone solvability check: repeatedly find any remaining car with a currently clear run to
+    // the boundary, remove it, repeat. Correct because nothing ever repositions to block a car -
+    // a car that's clear now stays clear (or becomes clear) regardless of removal order, so a
+    // single greedy pass (no backtracking, no joint-state search) is sufficient.
+    static bool IsSolvable(List<CarSpec> cars, RectInt bounds)
     {
-        List<int> relevantIndices = ComputeRelevantCars(allCars, bounds);
-        var cars = new List<CarSpec>(relevantIndices.Count);
-        foreach (int index in relevantIndices) cars.Add(allCars[index]);
-
-        var staticObstacles = new HashSet<Vector2Int>();
-        for (int i = 0; i < allCars.Count; i++)
+        var remaining = new List<CarSpec>(cars);
+        bool progress = true;
+        while (progress && remaining.Count > 0)
         {
-            if (relevantIndices.Contains(i)) continue;
-            foreach (Vector2Int offset in allCars[i].offsets)
+            progress = false;
+            for (int i = remaining.Count - 1; i >= 0; i--)
             {
-                staticObstacles.Add(allCars[i].anchor + offset);
-            }
-        }
-
-        var start = new Vector2Int[cars.Count];
-        for (int i = 0; i < cars.Count; i++) start[i] = cars[i].anchor;
-
-        var visited = new HashSet<string> { Key(start) };
-        var queue = new Queue<Vector2Int[]>();
-        queue.Enqueue(start);
-
-        // Defensive cap - relevance pruning should already keep this small, but a hard ceiling
-        // means a pathological layout aborts this attempt and retries a fresh one instead of
-        // ever stalling the editor again.
-        const int maxStatesExplored = 200000;
-        int statesExplored = 0;
-
-        while (queue.Count > 0)
-        {
-            if (++statesExplored > maxStatesExplored) return false;
-
-            Vector2Int[] state = queue.Dequeue();
-            if (state[0] == exitAnchor) return true; //if car 1 reaches the exit, the puzzle is solvable
-
-            for (int i = 0; i < cars.Count; i++)
-            {
-                Vector2Int moved = SimulateSlide(cars, state, i, bounds, staticObstacles);
-                if (moved == state[i]) continue; //ignore if blocked (no movement)
-
-                // clone the state (to ensure original state remains untouched for other cars' moves)
-                // and update the moved car's position
-                var next = (Vector2Int[])state.Clone();
-                next[i] = moved;
-
-                //if the next state hasn't been visited yet, add it to the queue for further exploration
-                if (visited.Add(Key(next))) queue.Enqueue(next);
-            }
-        }
-        return false;
-    }
-
-    // A car can only ever occupy the straight corridor from its starting position to the board
-    // edge in its own fixed direction - that's a static property of its start+direction, not
-    // something that changes as other cars move. So closing over "does car X's current position
-    // sit inside any relevant car's full corridor" once, up front, correctly captures every car
-    // that could ever matter, without needing to re-derive relevance as the search progresses.
-    static List<int> ComputeRelevantCars(List<CarSpec> cars, RectInt bounds)
-    {
-        var relevant = new HashSet<int> { 0 }; // target is always index 0
-        var frontier = new Queue<int>();
-        frontier.Enqueue(0);
-
-        while (frontier.Count > 0)
-        {
-            int index = frontier.Dequeue();
-            HashSet<Vector2Int> lane = LaneCells(cars[index], bounds);
-
-            for (int j = 0; j < cars.Count; j++)
-            {
-                if (relevant.Contains(j)) continue;
-
-                foreach (Vector2Int offset in cars[j].offsets)
+                if (ReachesEdge(remaining, i, bounds))
                 {
-                    if (lane.Contains(cars[j].anchor + offset))
-                    {
-                        relevant.Add(j);
-                        frontier.Enqueue(j);
-                        break;
-                    }
+                    remaining.RemoveAt(i);
+                    progress = true;
                 }
             }
         }
-
-        return new List<int>(relevant);
+        return remaining.Count == 0;
     }
 
-    static HashSet<Vector2Int> LaneCells(CarSpec car, RectInt bounds)
+    // A car "reaches the edge" if nothing but the boundary itself stops its maximal slide -
+    // compares the maximal slide against the other remaining cars with the maximal slide against
+    // the boundary alone; identical results mean no other car was actually in the way.
+    static bool ReachesEdge(List<CarSpec> cars, int index, RectInt bounds)
     {
-        var cells = new HashSet<Vector2Int>();
+        CarSpec car = cars[index];
+        Vector2Int withObstacles = Grid.SlideUntilBlocked(car.anchor, _ => car.direction, c => FootprintFree(cars, index, c, bounds));
+        Vector2Int boundsOnly = Grid.SlideUntilBlocked(car.anchor, _ => car.direction, c => FootprintFitsBounds(car, c, bounds));
+        return withObstacles == boundsOnly;
+    }
+
+    static bool FootprintFree(List<CarSpec> cars, int movingIndex, Vector2Int anchor, RectInt bounds)
+    {
+        CarSpec car = cars[movingIndex];
         foreach (Vector2Int offset in car.offsets)
-        {
-            Vector2Int cell = car.anchor + offset;
-            while (bounds.Contains(cell))
-            {
-                cells.Add(cell);
-                cell += car.direction;
-            }
-        }
-        return cells;
-    }
-
-    static Vector2Int SimulateSlide(List<CarSpec> cars, Vector2Int[] state, int index, RectInt bounds, HashSet<Vector2Int> staticObstacles)
-    {
-        Vector2Int direction = cars[index].direction;
-        return Grid.SlideUntilBlocked(state[index], _ => direction, candidate => FootprintFreeInState(cars, state, index, candidate, bounds, staticObstacles));
-    }
-
-    //if the current car is placed here, would it overlap anything
-    static bool FootprintFreeInState(List<CarSpec> cars, Vector2Int[] state, int movingIndex, Vector2Int anchor, RectInt bounds, HashSet<Vector2Int> staticObstacles)
-    {
-        foreach (Vector2Int offset in cars[movingIndex].offsets)
         {
             Vector2Int cell = anchor + offset;
             if (!bounds.Contains(cell)) return false;
-            if (staticObstacles.Contains(cell)) return false;
 
             for (int j = 0; j < cars.Count; j++)
             {
                 if (j == movingIndex) continue;
                 foreach (Vector2Int otherOffset in cars[j].offsets)
                 {
-                    if (state[j] + otherOffset == cell) return false;
+                    if (cars[j].anchor + otherOffset == cell) return false;
                 }
             }
         }
         return true;
     }
 
-    static string Key(Vector2Int[] state)
+    static bool FootprintFitsBounds(CarSpec car, Vector2Int anchor, RectInt bounds)
     {
-        var builder = new StringBuilder();
-        foreach (Vector2Int position in state)
+        foreach (Vector2Int offset in car.offsets)
         {
-            builder.Append(position.x).Append(',').Append(position.y).Append('|');
+            if (!bounds.Contains(anchor + offset)) return false;
         }
-        return builder.ToString();
+        return true;
     }
 }

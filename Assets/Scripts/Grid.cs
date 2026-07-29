@@ -22,10 +22,6 @@ public class Grid : MonoBehaviour
 
     readonly HashSet<Vector2Int> occupiedCells = new HashSet<Vector2Int>();
 
-    // Per-cell track direction (Parking Jam maze bends) - a cell with no explicit override just
-    // isn't part of a bent track, so callers fall back to whatever default they'd otherwise use.
-    readonly Dictionary<Vector2Int, Vector2Int> flowDirections = new Dictionary<Vector2Int, Vector2Int>();
-
     Camera cam;
     float cellSize;
     Vector2 origin;
@@ -91,16 +87,6 @@ public class Grid : MonoBehaviour
     {
         if (occupied) occupiedCells.Add(cell);
         else occupiedCells.Remove(cell);
-    }
-
-    public Vector2Int GetFlowDirection(Vector2Int cell, Vector2Int fallback)
-    {
-        return flowDirections.TryGetValue(cell, out Vector2Int direction) ? direction : fallback;
-    }
-
-    public void SetFlowDirection(Vector2Int cell, Vector2Int direction)
-    {
-        flowDirections[cell] = direction;
     }
 
     // Steps in whatever direction directionAt reports at each cell, until anchorFree says the
