@@ -135,6 +135,7 @@ GameObject:
   - component: {fileID: 414790135}
   - component: {fileID: 414790133}
   - component: {fileID: 414790134}
+  - component: {fileID: 414790136}
   m_Layer: 0
   m_Name: Grid Manager
   m_TagString: Untagged
@@ -237,6 +238,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tokenPrefab: {fileID: 7267781291361426296, guid: 2cdcf9fb4a963ef46acbed1a2b005c1e, type: 3}
+--- !u!114 &414790136
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 414790130}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7378c107d3e427ba58f4f8c9de3a818, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tokenPrefab: {fileID: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -448,7 +462,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 571120245}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d744ddc9f99f8a049850c5fd2bfbaf58, type: 3}
   m_Name: 
@@ -463,14 +477,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 571120245}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 54935ebaceebd394fa1bce8e72db46d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   fillRatio: 0.55
   maxGenerationAttempts: 60
-  targetGroup: 0
+  minLength: 2
+  maxLength: 8
 --- !u!114 &571120250
 MonoBehaviour:
   m_ObjectHideFlags: 0

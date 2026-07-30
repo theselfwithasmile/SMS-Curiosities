@@ -31,32 +31,35 @@ public class TileConnectZone : MonoBehaviour
 
         var bounds = new RectInt(margin, margin, fieldWidth, fieldHeight);
 
+        //per-cell layout
         List<Container> cells = new PerTileLayout().Build(bounds, boardColor);
         new ContainerRuleSet { EntryConstraint = new NoEntryConstraint(), OccupantInteraction = new PathConnectInteraction() }.ApplyToAll(cells);
-
         var cellLookup = new Dictionary<Vector2Int, Container>();
-        foreach (Container cell in cells) cellLookup[cell.OrderedCells[0]] = cell;
+        foreach (Container cell in cells) cellLookup[cell.OrderedCells[0]] = cell; //maps each (per-grid) container to the grid coords
 
+        
+        //pair generation
         var pairs = new List<(Vector2Int a, Vector2Int b, int group)>();
-        var reserved = new HashSet<Vector2Int>();
+        var reserved = new HashSet<Vector2Int>();  //tracks cells already paired
         var order = new List<Vector2Int>(cellLookup.Keys);
         ContainerManager.Shuffle(order);
-
         int nextGroup = 0;
         foreach (Vector2Int a in order)
         {
             if (reserved.Contains(a)) continue;
 
-            List<Vector2Int> candidates = ReachableTileCells(a, cellLookup, reserved);
-            if (candidates.Count == 0) continue; // straggler - left unpaired, a rare acceptable leftover
+            //runs a BFS through all reachable unreserved space
+            List<Vector2Int> candidates = ReachableTileCells(a, cellLookup, reserved);  
+            if (candidates.Count == 0) continue; //left unpaired, a rare acceptable leftover
 
-            Vector2Int b = candidates[Random.Range(0, candidates.Count)];
+            Vector2Int b = candidates[Random.Range(0, candidates.Count)];  //picks random compatible partner
             reserved.Add(a);
             reserved.Add(b);
             pairs.Add((a, b, nextGroup));
             nextGroup++;
         }
 
+        //spawns token
         foreach ((Vector2Int a, Vector2Int b, int group) in pairs)
         {
             SeedToken(cellLookup[a], group, grid.CellToWorld(a));
@@ -64,22 +67,19 @@ public class TileConnectZone : MonoBehaviour
         }
     }
 
-    // Places a token directly into Members rather than through TryAccept, since the cell's own
-    // NoEntryConstraint would otherwise reject it the same way it rejects a player's drag.
+    //places a token directly into Members rather than through TryAccept, since the cell's own
+    //NoEntryConstraint would otherwise reject it the same way it rejects a player's drag
     static void SeedToken(Container cell, int group, Vector3 worldPosition)
     {
-        Token token = ContainerManager.Instance.SpawnColoredToken(group, worldPosition);
+        Token token = TokenSpawner.Instance.SpawnColoredToken(group, worldPosition);
         cell.Members.Add(token);
         token.CurrentContainer = cell;
     }
 
-    // Cells reachable from seed by walking through unreserved space (open margin cells have no
-    // container at all and are always passable), restricted to other unpaired tile-field cells -
-    // structurally the same flood-fill as the runtime PathConnectInteraction uses, but checked
-    // against the generation-time reserved set instead of live Container membership.
+    //BFS flood fills
     static List<Vector2Int> ReachableTileCells(Vector2Int seed, Dictionary<Vector2Int, Container> cellLookup, HashSet<Vector2Int> reserved)
     {
-        var visited = new HashSet<Vector2Int> { seed };
+        var visited = new HashSet<Vector2Int> { seed }; 
         var frontier = new Queue<Vector2Int>();
         frontier.Enqueue(seed);
         var result = new List<Vector2Int>();
@@ -91,7 +91,7 @@ public class TileConnectZone : MonoBehaviour
             {
                 if (visited.Contains(neighbor) || reserved.Contains(neighbor)) continue;
                 visited.Add(neighbor);
-                frontier.Enqueue(neighbor);
+                frontier.Enqueue(neighbor);  //flood fills even on container-less cells
                 if (cellLookup.ContainsKey(neighbor) && neighbor != seed) result.Add(neighbor);
             }
         }

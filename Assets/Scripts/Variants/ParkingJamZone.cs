@@ -58,7 +58,7 @@ public class ParkingJamZone : MonoBehaviour
         Grid grid = Grid.Instance;
         Vector2Int anchor = car.body[0];
         var offsets = new List<Vector2Int>(car.body.Count);
-        foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor);
+        foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor); //applies local offset
 
         Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, grid.CellToWorld(anchor), offsets);
         token.EscapeLane = car.escapeLane;
@@ -76,8 +76,8 @@ public class ParkingJamZone : MonoBehaviour
     {
         var cars = new List<CarSpec>();
         var occupied = new HashSet<Vector2Int>();
-        int targetFilled = Mathf.RoundToInt(fillRatio * bounds.width * bounds.height);
-
+        
+        //builds shuffled list of coords
         var freeCells = new List<Vector2Int>();
         for (int y = bounds.yMin; y < bounds.yMax; y++)
         {
@@ -87,7 +87,9 @@ public class ParkingJamZone : MonoBehaviour
             }
         }
         ContainerManager.Shuffle(freeCells);
-
+        
+        //fills grid until targetFilled is reached
+        int targetFilled = Mathf.RoundToInt(fillRatio * bounds.width * bounds.height); //percentage of grid to be filled
         foreach (Vector2Int cell in freeCells)
         {
             if (occupied.Count >= targetFilled) break;
@@ -106,21 +108,21 @@ public class ParkingJamZone : MonoBehaviour
     CarSpec BuildCarAt(Vector2Int start, RectInt bounds, HashSet<Vector2Int> occupied)
     {
         int targetLength = Random.Range(minLength, maxLength + 1);
-        float turnChance = Mathf.Clamp01((targetLength - minLength) / (float)Mathf.Max(1, maxLength - minLength));
+        float turnChance = Mathf.Clamp01((targetLength - minLength) / (float)Mathf.Max(1, maxLength - minLength));  //normalized chance
 
         var body = new List<Vector2Int> { start };
         Vector2Int direction = Directions[Random.Range(0, Directions.Length)];
 
+        //extends body
         for (int i = 1; i < targetLength; i++)
         {
-            Vector2Int tail = body[body.Count - 1];
-            Vector2Int? next = StepBody(tail, direction, turnChance, bounds, occupied, body);
+            Vector2Int head = body[body.Count - 1];
+            Vector2Int? next = StepBody(head, direction, turnChance, bounds, occupied, body);
             if (!next.HasValue) break;
 
-            direction = next.Value - tail;
+            direction = next.Value - head; 
             body.Add(next.Value);
         }
-
         foreach (Vector2Int cell in body) occupied.Add(cell);
 
         List<Vector2Int> lane = BuildEscapeLane(body[body.Count - 1], direction, bounds);
@@ -133,7 +135,9 @@ public class ParkingJamZone : MonoBehaviour
     // pass (other pieces' bodies) and this piece's own body so far.
     static Vector2Int? StepBody(Vector2Int from, Vector2Int direction, float turnChance, RectInt bounds, HashSet<Vector2Int> occupied, List<Vector2Int> body)
     {
-        var candidates = new List<Vector2Int>();
+        //builds direction priority list instead of naively shuffling
+        //which would otherwise make self collision much more probable, making longer tokens much less likely
+        var candidates = new List<Vector2Int>();  
         if (Random.value < turnChance)
         {
             candidates.Add(Perpendicular(direction, true));
@@ -150,36 +154,31 @@ public class ParkingJamZone : MonoBehaviour
         foreach (Vector2Int candidateDir in candidates)
         {
             Vector2Int candidate = from + candidateDir;
+            
+            //registers the first valid direction
             if (bounds.Contains(candidate) && !occupied.Contains(candidate) && !body.Contains(candidate))
             {
                 return candidate;
             }
+            
+            //if invalid, try again with the direction of lower priority, aka the ones later in the candidate list
         }
         return null;
     }
 
-    // Continues past the body's head in the same bent style until stepping off the grid - these
-    // cells (never the body's own) are what must be clear of every other still-present piece for
-    // this one to escape. Mostly straight (a steady corridor reads better than constant zig-zag,
-    // and it's never rendered - purely a logical corridor) with an occasional turn so the lane can
-    // weave across whatever other bodies end up sitting in it. Turning is capped by step count
-    // (not skipped once the cap is hit) so the walk is always still walking a fixed direction by
-    // the time it must exit - which any fixed direction is guaranteed to do on a bounded grid.
+    // Continues straight past the body's head in whatever direction the body's own last segment
+    // was already heading - these cells (never the body's own) are what must be clear of every
+    // other still-present piece for this one to escape. The direction has to stay exactly what
+    // the piece's own shape visibly implies (the last segment's heading is the only escape-facing
+    // cue a player can actually see) - a lane that bent on its own past that, invisibly, would let
+    // pieces get blocked or escape for reasons nothing on screen explains.
     static List<Vector2Int> BuildEscapeLane(Vector2Int head, Vector2Int direction, RectInt bounds)
     {
-        const float laneTurnChance = 0.15f;
         var lane = new List<Vector2Int>();
         Vector2Int current = head;
-        int turningStepsLeft = bounds.width + bounds.height;
 
         while (true)
         {
-            if (turningStepsLeft > 0 && Random.value < laneTurnChance)
-            {
-                direction = Perpendicular(direction, Random.value < 0.5f);
-            }
-            turningStepsLeft--;
-
             Vector2Int next = current + direction;
             if (!bounds.Contains(next)) return lane;
 
@@ -208,6 +207,8 @@ public class ParkingJamZone : MonoBehaviour
         }
 
         bool progress = true;
+        
+        //keeps iterating over the list of remaining cars until there is none left
         while (progress && remaining.Count > 0)
         {
             progress = false;
