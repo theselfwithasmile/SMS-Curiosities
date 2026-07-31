@@ -17,6 +17,14 @@ public class Grid : MonoBehaviour
     public int Rows => rows;
     public float CellSize => cellSize;
 
+    // Rows appended past the puzzle rows for a zone's bench/staging area - claimed dynamically
+    // via ReserveBenchRows by whichever zone actually needs one, rather than manually budgeted
+    // into `rows` per scene (that's what silently overflowed before: a bench trying to fit inside
+    // whatever was left of a fixed row count, rather than the grid growing to fit the bench).
+    public int BenchOrigin => rows;
+    public int TotalRows => rows + benchRows;
+    int benchRows;
+
     const int MaxInstancesPerBatch = 1023;
 
     readonly HashSet<Vector2Int> occupiedCells = new HashSet<Vector2Int>();
@@ -43,6 +51,17 @@ public class Grid : MonoBehaviour
         DrawEmptyCells();
     }
 
+    // Grows the viewport-fit math to include a zone's bench rows - called once, early in a
+    // zone's Start(), before it positions anything there. Recomputes layout immediately (rather
+    // than waiting for the next Update()) so this same frame's CellToWorld calls already reflect
+    // the corrected sizing, avoiding a one-frame visual jump.
+    public void ReserveBenchRows(int count)
+    {
+        if (count <= benchRows) return;
+        benchRows = count;
+        RecomputeLayout();
+    }
+
     // Cell size is derived from the camera's visible world size (not a fixed value) so the
     // whole grid keeps fitting the screen across aspect ratios/orientations, with square cells.
     void RecomputeLayout()
@@ -52,9 +71,9 @@ public class Grid : MonoBehaviour
         float usableWidth = viewportWidth * (1f - viewportPadding * 2f);
         float usableHeight = viewportHeight * (1f - viewportPadding * 2f);
 
-        cellSize = Mathf.Min(usableWidth / columns, usableHeight / rows);
+        cellSize = Mathf.Min(usableWidth / columns, usableHeight / TotalRows);
 
-        Vector2 gridSize = new Vector2(cellSize * columns, cellSize * rows);
+        Vector2 gridSize = new Vector2(cellSize * columns, cellSize * TotalRows);
         Vector2 center = (Vector2)cam.transform.position + (Vector2)transform.position;
         origin = center - gridSize * 0.5f;
     }
@@ -63,7 +82,7 @@ public class Grid : MonoBehaviour
     {
         Vector2 local = (Vector2)worldPosition - origin;
         int cellX = Mathf.Clamp(Mathf.FloorToInt(local.x / cellSize), 0, columns - 1);
-        int cellY = Mathf.Clamp(Mathf.FloorToInt(local.y / cellSize), 0, rows - 1);
+        int cellY = Mathf.Clamp(Mathf.FloorToInt(local.y / cellSize), 0, TotalRows - 1);
         return new Vector2Int(cellX, cellY);
     }
 
@@ -72,6 +91,11 @@ public class Grid : MonoBehaviour
         return CellCenter(cell.x, cell.y);
     }
 
+    // Deliberately scoped to the puzzle rows only, not TotalRows - this backs geometry/adjacency
+    // logic (e.g. ContainerManager.Neighbors, used by flood-fill matching), and bench cells
+    // shouldn't ever be treated as puzzle-board neighbors just because they happen to sit
+    // adjacent to the board's edge row. WorldToCell/DrawEmptyCells intentionally use TotalRows
+    // instead, since a bench does need to be reachable by drops and visible on screen.
     public bool IsInBounds(Vector2Int cell)
     {
         return cell.x >= 0 && cell.x < columns && cell.y >= 0 && cell.y < rows;
@@ -95,8 +119,8 @@ public class Grid : MonoBehaviour
 
     void DrawEmptyCells()
     {
-        var matrices = new List<Matrix4x4>(columns * rows);
-        for (int y = 0; y < rows; y++)
+        var matrices = new List<Matrix4x4>(columns * TotalRows);
+        for (int y = 0; y < TotalRows; y++)
         {
             for (int x = 0; x < columns; x++)
             {

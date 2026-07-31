@@ -48,6 +48,15 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         GetComponent<SpriteRenderer>().color = GameState.Instance.SecondaryGroupColor(Group);
     }
 
+    // Layering: a buried token starts hidden and non-interactive (SetRevealed(false) right after
+    // spawn) until whatever's above it in the same cell clears, at which point Container.RevealNext
+    // calls this again with true.
+    public void SetRevealed(bool revealed)
+    {
+        GetComponent<SpriteRenderer>().enabled = revealed;
+        GetComponent<Collider2D>().enabled = revealed;
+    }
+
     public void OnBeginDrag(PointerEventData eventData)
     {
         originalPosition = transform.position;

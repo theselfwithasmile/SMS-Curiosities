@@ -73,6 +73,11 @@ public class Container
     public IResolution Resolution;
     public IOccupantInteraction OccupantInteraction;
 
+    // Layering: tokens waiting underneath the current occupant(s), hidden and non-interactive
+    // until revealed. Empty for every non-layered container (the ordinary case) - RevealNext is a
+    // no-op whenever this is empty, so layering costs nothing for zones that don't use it.
+    public readonly Queue<Token> BuriedTokens = new Queue<Token>();
+
     public int Capacity => OrderedCells.Count;
 
     public Container(List<Vector2Int> orderedCells, Color color)
@@ -140,6 +145,10 @@ public class Container
         return true;
     }
 
+    // Deliberately does NOT reveal the next buried token - also used for temporary removals that
+    // immediately re-fill the same cell in the same operation (drag pickup that might revert
+    // right back, a swap's displaced occupant), where surfacing what's buried underneath would be
+    // premature and would collide with whatever's about to be placed back into this same slot.
     public bool TryRemove(Token token)
     {
         if (!Members.Contains(token) || !CanRemove(token)) return false;
@@ -147,5 +156,38 @@ public class Container
         Members.Remove(token);
         if (token.CurrentContainer == this) token.CurrentContainer = null;
         return true;
+    }
+
+    // Permanently removes a token that's being taken out of play entirely (matched and destroyed,
+    // for instance) - as opposed to TryRemove, which doubles as a temporary detach for pickups
+    // that might come right back. Reveals whatever's buried underneath, if anything. Callers still
+    // own destroying the token's GameObject themselves.
+    public void Consume(Token token)
+    {
+        TryRemove(token);
+        RevealNext();
+    }
+
+    // Clears every current member outright (a whole-container clear like Block Puzzle's full-row
+    // resolution, as opposed to Consume's single-token removal) and reveals whatever's buried
+    // underneath. Only for clears that don't immediately re-fill the same container afterward -
+    // Merge's combine deliberately does NOT use this, since it always refills the same cell right
+    // away and a reveal firing first would collide with that.
+    public void ClearMembers()
+    {
+        Members.Clear();
+        RevealNext();
+    }
+
+    // Promotes the next buried token into this cell once it has room - only relevant for layered
+    // containers (BuriedTokens non-empty); a no-op otherwise, so ordinary containers pay nothing.
+    void RevealNext()
+    {
+        if (Members.Count >= Capacity || BuriedTokens.Count == 0) return;
+
+        Token next = BuriedTokens.Dequeue();
+        next.SetRevealed(true);
+        next.transform.position = Grid.Instance.CellToWorld(OrderedCells[Members.Count]);
+        ForceAccept(next);
     }
 }

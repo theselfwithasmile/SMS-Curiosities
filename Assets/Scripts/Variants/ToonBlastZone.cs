@@ -12,6 +12,14 @@ public class ToonBlastZone : Zone
 {
     protected override int QuotaFactor => 3;  //min match capacity
 
+    // Each cell gets 1..maxLayers stacked tokens - only the top one is visible/matchable. Clearing
+    // it (via SwapInteraction's match, which goes through Container.Consume) reveals whatever's
+    // buried underneath. Only the top layer is quota-matched for a guaranteed-clearable
+    // starting board; buried layers are plain random groups - free rearrangement means the player
+    // can always wait for enough of a color to accumulate as deeper layers get exposed, so this
+    // doesn't need the same hard guarantee the visible layer does.
+    [SerializeField] int maxLayers = 2;
+
     // The bench here only ever gains tokens gradually (one grouped token per match cleared, not
     // pre-filled at generation like Water Sort's), so a modest fixed capacity is fine rather than
     // trying to predict an exact total up front.
@@ -26,5 +34,23 @@ public class ToonBlastZone : Zone
         }.ApplyToAll(cells);
 
         return cells;
+    }
+
+    protected override void GenerateTokens()
+    {
+        for (int i = 0; i < containerCount; i++)
+        {
+            Container cell = containers[i];
+            Token top = TokenSpawner.Instance.SpawnColoredToken(groups[i], grid.CellToWorld(cell.OrderedCells[0]));
+            cell.TryAccept(top);
+
+            int layers = Random.Range(1, maxLayers + 1);
+            for (int layer = 1; layer < layers; layer++)
+            {
+                Token buried = TokenSpawner.Instance.SpawnColoredToken(Random.Range(0, groupCount), grid.CellToWorld(cell.OrderedCells[0]));
+                buried.SetRevealed(false);
+                cell.BuriedTokens.Enqueue(buried);
+            }
+        }
     }
 }

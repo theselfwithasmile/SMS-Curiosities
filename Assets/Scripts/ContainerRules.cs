@@ -5,7 +5,7 @@ public class GroupMatchConstraint : IEntryConstraint
 {
     public bool CanAccept(Token token, Container container)
     {
-        return true;;//container.Members.Count == 0 || container.Members[0].Group == token.Group;
+        return container.Members.Count == 0 || container.Members[0].Group == token.Group;
     }
 }
 
@@ -16,7 +16,7 @@ public class GroupMatchConstraint : IEntryConstraint
 // exist, collapsing the puzzle into free rearrangement).
 public class NoEntryConstraint : IEntryConstraint
 {
-    public bool CanAccept(Token token, Container container) => true;//false;
+    public bool CanAccept(Token token, Container container) => false;
 }
 
 public class FullPredicate : ICompletionPredicate
@@ -63,7 +63,7 @@ public class ClearResolution : IResolution
         {
             if (token != null) Object.Destroy(token.gameObject);
         }
-        container.Members.Clear();
+        container.ClearMembers();
     }
 }
 
@@ -89,7 +89,7 @@ public class SpawnTokenResolution : IResolution
         {
             if (member != null) Object.Destroy(member.gameObject);
         }
-        container.Members.Clear();
+        container.ClearMembers();
 
         //spawn token on the destination container if it has space, otherwise spawn on the original container
         Vector2Int spawnCell = destination.Members.Count < destination.Capacity
@@ -119,6 +119,9 @@ public class MergeInteraction : IOccupantInteraction
 
         Object.Destroy(incoming.gameObject);
         Object.Destroy(occupant.gameObject);
+        // Deliberately Members.Clear(), not ClearMembers() - this always refills the same cell
+        // with the merged result right below, so revealing a buried layer here would collide with
+        // that (Merge doesn't use layering today, but the ordering matters if it ever does).
         container.Members.Clear();
 
         Token merged = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(cell));
@@ -181,7 +184,7 @@ public class SwapInteraction : IOccupantInteraction
         foreach (Container matched in claimed)
         {
             Token token = matched.Members[0];
-            matched.TryRemove(token);
+            matched.Consume(token);
             Object.Destroy(token.gameObject);
         }
 
@@ -217,7 +220,7 @@ public class PathConnectInteraction : IOccupantInteraction
         Vector2Int target = container.OrderedCells[0];
         if (!IsReachable(origin, target)) return false;
 
-        container.TryRemove(occupant);
+        container.Consume(occupant);
         Object.Destroy(occupant.gameObject);
         Object.Destroy(incoming.gameObject);
         return true;

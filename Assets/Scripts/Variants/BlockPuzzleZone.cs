@@ -16,6 +16,11 @@ public class BlockPuzzleZone : Zone
         new List<Vector2Int> { Vector2Int.zero, Vector2Int.right, Vector2Int.up, Vector2Int.up + Vector2Int.right },
     };
 
+    // No real bench Container here, just raw grid space for the staging row - reserved as its own
+    // rows rather than borrowed from boardSize, so it never competes with the board for space.
+    // 2 rows (not 1) since the tallest canonical shapes above are 2 cells tall.
+    protected override int ExtraReservedRows => 2;
+
     protected override List<Container> GenerateContainers()
     {
         List<Container> board = new OrthogonalLayout().Build(new RectInt(0, 0, boardSize, boardSize), boardColor);

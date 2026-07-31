@@ -22,20 +22,32 @@ namespace Variants
         protected List<int> groups;
 
         // How many token slots the bench needs to hold - 0 means no bench at all (most zones).
-        // A flat "1 row" default would silently overflow (Water Sort needs tubeCount*capacity
-        // slots, easily more than one row's worth of columns) - sized to fit instead.
+        // Converted to rows and reserved on the grid itself (Grid.ReserveBenchRows), which grows
+        // the grid to fit rather than squeezing the bench into whatever's left of a fixed row
+        // count - that's what silently overflowed before (Water Sort needing tubeCount*capacity
+        // slots, easily more than one row's worth of columns).
         protected virtual int BenchCapacity => 0;
+
+        // Extra rows reserved with no Container attached - for a zone that just needs raw grid
+        // space outside the board (Block Puzzle's piece-staging row), as opposed to BenchCapacity
+        // which also creates a real accept/reject Container there.
+        protected virtual int ExtraReservedRows => 0;
 
         void Start()
         {
             grid = Grid.Instance;
-            boardSize = Mathf.Min(boardLength, grid.Columns, grid.Rows - 1);
+            boardSize = Mathf.Min(boardLength, grid.Columns, grid.Rows);
             groupCount = GameState.Instance.GroupCount;
 
-            if (BenchCapacity > 0)
+            int benchRows = BenchCapacity > 0 ? Mathf.Max(1, Mathf.CeilToInt(BenchCapacity / (float)grid.Columns)) : 0;
+            int reservedRows = benchRows + ExtraReservedRows;
+            if (reservedRows > 0)
             {
-                int benchRows = Mathf.Max(1, Mathf.CeilToInt(BenchCapacity / (float)grid.Columns));
-                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, boardSize, grid.Columns, benchRows), Color.gray);
+                grid.ReserveBenchRows(reservedRows);
+            }
+            if (benchRows > 0)
+            {
+                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, grid.BenchOrigin, grid.Columns, benchRows), Color.gray);
             }
 
             containers = GenerateContainers();

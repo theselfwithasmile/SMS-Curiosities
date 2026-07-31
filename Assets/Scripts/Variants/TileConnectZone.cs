@@ -48,7 +48,17 @@ public class TileConnectZone : Zone
         var reserved = new HashSet<Vector2Int>();  //tracks cells already paired
         var order = new List<Vector2Int>(cellLookup.Keys);
         ContainerManager.Shuffle(order);
-        int nextGroup = 0;
+
+        // One color per PAIR, drawn from the shared palette rather than a unique id per pair -
+        // lets a player match any two reachable same-colored tiles, not just the one specific
+        // partner generation happened to assign (PathConnectInteraction re-checks reachability
+        // live at match time regardless, so this only ever adds valid moves, never removes the
+        // guaranteed reverse-generation clearing order).
+        int pairCount = cellLookup.Count / 2;
+        List<int> colors = ContainerManager.BuildQuotaMatchedGroups(pairCount, groupCount, 1);
+        ContainerManager.Shuffle(colors);
+        int nextColorIndex = 0;
+
         foreach (Vector2Int a in order)
         {
             if (reserved.Contains(a)) continue;
@@ -60,8 +70,8 @@ public class TileConnectZone : Zone
             Vector2Int b = candidates[Random.Range(0, candidates.Count)];  //picks random compatible partner
             reserved.Add(a);
             reserved.Add(b);
-            pendingPairs.Add((a, b, nextGroup));
-            nextGroup++;
+            pendingPairs.Add((a, b, colors[nextColorIndex]));
+            nextColorIndex++;
         }
 
         return true;
