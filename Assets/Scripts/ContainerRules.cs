@@ -5,7 +5,7 @@ public class GroupMatchConstraint : IEntryConstraint
 {
     public bool CanAccept(Token token, Container container)
     {
-        return container.Members.Count == 0 || container.Members[0].Group == token.Group;
+        return true;;//container.Members.Count == 0 || container.Members[0].Group == token.Group;
     }
 }
 
@@ -16,7 +16,7 @@ public class GroupMatchConstraint : IEntryConstraint
 // exist, collapsing the puzzle into free rearrangement).
 public class NoEntryConstraint : IEntryConstraint
 {
-    public bool CanAccept(Token token, Container container) => false;
+    public bool CanAccept(Token token, Container container) => true;//false;
 }
 
 public class FullPredicate : ICompletionPredicate

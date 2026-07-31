@@ -7,7 +7,8 @@ public class GameState: MonoBehaviour
     public static GameState Instance;
     
     public Vector2 mousePos;
-    
+    public int currZoneIdx=0;
+
     [SerializeField] Color[] groupColors;
     static readonly List<Vector2Int>[] Shapes =
     {
@@ -22,6 +23,12 @@ public class GameState: MonoBehaviour
     
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
         DontDestroyOnLoad(gameObject);
     }

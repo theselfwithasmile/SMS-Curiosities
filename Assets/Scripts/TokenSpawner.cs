@@ -14,7 +14,7 @@ public class TokenSpawner : MonoBehaviour
     
     public Token SpawnToken(int group, Vector3 worldPosition)
     {
-        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity);
+        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, transform);
         token.Group = group;
         return token;
     }

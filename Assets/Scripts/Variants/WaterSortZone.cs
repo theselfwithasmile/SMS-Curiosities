@@ -6,7 +6,7 @@ public class WaterSortZone : Zone
 {
     [SerializeField] int tubeCount = 3;
     protected override int QuotaFactor => 3;  //tube capacity
-    protected override bool NeedsBench => true;
+    protected override int BenchCapacity => tubeCount * QuotaFactor;
 
     protected override List<Container> GenerateContainers()
     {
@@ -25,6 +25,19 @@ public class WaterSortZone : Zone
         }.ApplyToAll(tubes);
 
         return tubes;
+    }
+
+    // The shared default GenerateGroups() quota-matches one entry per CONTAINER (right for a
+    // zone that spawns one token per cell) - Water Sort instead needs one entry per eventual
+    // BENCH TOKEN (tubeCount * capacity), matched against exactly tubeCount groups so every tube
+    // can be filled with a single color. Using the container-count default here was generating
+    // far too few tokens (one per tube, not per tube-slot) and spreading them across the wrong
+    // number of groups.
+    protected override List<int> GenerateGroups()
+    {
+        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(tubeCount * QuotaFactor, tubeCount, QuotaFactor);
+        ContainerManager.Shuffle(tokenGroups);
+        return tokenGroups;
     }
 
     protected override void GenerateTokens()

@@ -19,12 +19,23 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // since they're parented under this Transform.
     public List<Vector2Int> CellOffsets = new List<Vector2Int> { Vector2Int.zero };
 
-    // Arrow/Parking Jam: the fixed corridor (absolute cells, beyond the body) leading from this
-    // token's head to the grid boundary, baked in at spawn. Non-null means drag-end resolves via
-    // ResolveEscapeDrag (fully escape or fully revert) instead of ordinary container placement -
-    // the piece's own body never partially moves, so all that matters is whether every lane cell
-    // is currently free of every other still-present piece.
+    // Arrow/Parking Jam: true means drag-end resolves via ResolveEscapeDrag (fully escape or
+    // fully revert) instead of ordinary container placement. Deliberately a plain bool rather than
+    // gating on "EscapeLane != null" - Unity's serializer can't represent null for a List<T> field
+    // on a prefab-instantiated object, so an untouched EscapeLane silently comes back as an empty
+    // list rather than null, making a null-check unusable as a marker here.
+    public bool IsEscapePiece;
+
+    // The fixed corridor (absolute cells, beyond the body) leading from this token's head to the
+    // grid boundary, baked in at spawn - only meaningful when IsEscapePiece is true. The piece's
+    // own body never partially moves, so all that matters is whether every lane cell is currently
+    // free of every other still-present piece.
     public List<Vector2Int> EscapeLane;
+
+    // The direction EscapeLane runs in - needed to check that a drag actually aimed the piece
+    // toward its own exit before consulting the lane at all (a lane that happens to be clear
+    // shouldn't let ANY drag, in any direction or distance, trigger an escape).
+    public Vector2Int EscapeDirection;
 
     Vector3 pointerOffset;
     Vector3 originalPosition;
@@ -62,7 +73,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         if (!dragAllowed || Grid.Instance == null) return;
 
-        if (EscapeLane != null)
+        if (IsEscapePiece)
         {
             ResolveEscapeDrag();
             return;
@@ -104,6 +115,25 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // slide simulation needed at all.
     void ResolveEscapeDrag()
     {
+        Vector2Int anchor = Grid.Instance.WorldToCell(originalPosition);
+
+        // Continuous world-space movement, not grid-cell movement - a cell can easily span a
+        // large chunk of the screen, so requiring the drop to have crossed into a whole different
+        // cell before even registering direction would make ordinary drags never trigger at all.
+        Vector2 worldDelta = (Vector2)transform.position - (Vector2)originalPosition;
+        Vector2 escapeDirWorld = new Vector2(EscapeDirection.x, EscapeDirection.y);
+
+        // Only actually attempt the exit if the drag aimed this piece toward its own escape
+        // direction - dropping it anywhere else (or barely moving it at all) should just snap
+        // back, not silently trigger an escape check the drag itself never aimed at.
+        bool draggedTowardExit = Vector2.Dot(worldDelta, escapeDirWorld) > 0f;
+        if (!draggedTowardExit)
+        {
+            transform.position = originalPosition;
+            originalContainer?.ForceAccept(this);
+            return;
+        }
+
         foreach (Vector2Int cell in EscapeLane)
         {
             if (Grid.Instance.IsOccupied(cell))
@@ -114,7 +144,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             }
         }
 
-        Vector2Int anchor = Grid.Instance.WorldToCell(originalPosition);
         SetFootprintOccupied(anchor, false);
         Destroy(gameObject);
     }

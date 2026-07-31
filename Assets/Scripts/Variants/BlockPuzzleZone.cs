@@ -40,7 +40,11 @@ public class BlockPuzzleZone : Zone
             if (stageX + width > grid.Columns) break;
 
             Vector3 anchorWorld = grid.CellToWorld(new Vector2Int(stageX, stagingRow));
-            TokenSpawner.Instance.SpawnMultiCellToken(groups[i], anchorWorld, shape);
+            // Each staged piece picks its own group directly - the shared `groups` list is quota-
+            // matched against board CELLS for an unrelated purpose (and doesn't even apply here,
+            // since these board containers have no group entry constraint), and is sized to
+            // containerCount, not pieceCount, so indexing it by staged-piece index was fragile.
+            TokenSpawner.Instance.SpawnMultiCellToken(Random.Range(0, groupCount), anchorWorld, shape);
 
             stageX += width + 1;
         }

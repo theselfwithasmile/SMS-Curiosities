@@ -82,6 +82,7 @@ public class Container
         Color = color;
     }
 
+
     public Vector2Int NextAvailableCell() => OrderedCells[Members.Count];
 
     public bool CanAccept(Token token)

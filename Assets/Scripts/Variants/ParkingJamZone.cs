@@ -27,6 +27,7 @@ public class ParkingJamZone : Zone
     {
         public List<Vector2Int> body; // absolute cells, tail to head
         public List<Vector2Int> escapeLane; // absolute cells, beyond the head, up to the boundary
+        public Vector2Int direction;
         public int group;
     }
 
@@ -52,7 +53,9 @@ public class ParkingJamZone : Zone
             foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor); //applies local offset
 
             Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, grid.CellToWorld(anchor), offsets);
+            token.IsEscapePiece = true;
             token.EscapeLane = car.escapeLane;
+            token.EscapeDirection = car.direction;
 
             foreach (Vector2Int cell in car.body)
             {
@@ -117,9 +120,9 @@ public class ParkingJamZone : Zone
         }
         foreach (Vector2Int cell in body) occupied.Add(cell);
 
-        List<Vector2Int> lane = BuildEscapeLane(body[body.Count - 1], direction, bounds);
+        List<Vector2Int> lane = BuildEscapeLane(body, direction, bounds);
         int groupRange = Mathf.Max(1, GameState.Instance.GroupCount);
-        return new CarSpec { body = body, escapeLane = lane, group = Random.Range(0, groupRange) };
+        return new CarSpec { body = body, escapeLane = lane, direction = direction, group = Random.Range(0, groupRange) };
     }
 
     // Prefers turning (or not) per turnChance, tries the other perpendicular next, then straight
@@ -164,15 +167,20 @@ public class ParkingJamZone : Zone
     // the piece's own shape visibly implies (the last segment's heading is the only escape-facing
     // cue a player can actually see) - a lane that bent on its own past that, invisibly, would let
     // pieces get blocked or escape for reasons nothing on screen explains.
-    static List<Vector2Int> BuildEscapeLane(Vector2Int head, Vector2Int direction, RectInt bounds)
+    //
+    // Also stops if it would re-enter the piece's own body - a sharply-spiraled shape could
+    // otherwise have its straight exit line clip back through its own tail, which would make the
+    // solver correctly (if confusingly) treat it as permanently self-blocked; better to just cut
+    // the lane short there, same as hitting the boundary.
+    static List<Vector2Int> BuildEscapeLane(List<Vector2Int> body, Vector2Int direction, RectInt bounds)
     {
         var lane = new List<Vector2Int>();
-        Vector2Int current = head;
+        Vector2Int current = body[body.Count - 1];
 
         while (true)
         {
             Vector2Int next = current + direction;
-            if (!bounds.Contains(next)) return lane;
+            if (!bounds.Contains(next) || body.Contains(next)) return lane;
 
             lane.Add(next);
             current = next;

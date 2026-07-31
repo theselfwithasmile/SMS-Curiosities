@@ -11,7 +11,11 @@ using Variants;
 public class ToonBlastZone : Zone
 {
     protected override int QuotaFactor => 3;  //min match capacity
-    protected override bool NeedsBench => true;
+
+    // The bench here only ever gains tokens gradually (one grouped token per match cleared, not
+    // pre-filled at generation like Water Sort's), so a modest fixed capacity is fine rather than
+    // trying to predict an exact total up front.
+    protected override int BenchCapacity => Mathf.Max(1, boardSize);
 
     protected override List<Container> GenerateContainers()
     {

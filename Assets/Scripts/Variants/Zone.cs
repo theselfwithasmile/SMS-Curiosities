@@ -21,9 +21,10 @@ namespace Variants
         protected List<Container> containers;
         protected List<int> groups;
 
-        // Only WaterSort/Toon Blast actually spawn into a bench - reserving that row for every
-        // other zone would just shrink their playable board for nothing.
-        protected virtual bool NeedsBench => false;
+        // How many token slots the bench needs to hold - 0 means no bench at all (most zones).
+        // A flat "1 row" default would silently overflow (Water Sort needs tubeCount*capacity
+        // slots, easily more than one row's worth of columns) - sized to fit instead.
+        protected virtual int BenchCapacity => 0;
 
         void Start()
         {
@@ -31,9 +32,10 @@ namespace Variants
             boardSize = Mathf.Min(boardLength, grid.Columns, grid.Rows - 1);
             groupCount = GameState.Instance.GroupCount;
 
-            if (NeedsBench)
+            if (BenchCapacity > 0)
             {
-                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, boardSize, grid.Columns, 1), Color.gray);
+                int benchRows = Mathf.Max(1, Mathf.CeilToInt(BenchCapacity / (float)grid.Columns));
+                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, boardSize, grid.Columns, benchRows), Color.gray);
             }
 
             containers = GenerateContainers();

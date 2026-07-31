@@ -24,4 +24,18 @@ public class MergeZone : Zone
 
         return cells;
     }
+
+    // Merge needs a mostly-empty board (room to drag tokens into), not one token per cell - the
+    // shared default GenerateTokens() fully packs the board, which is wrong here.
+    protected override void GenerateTokens()
+    {
+        int spawnCount = Mathf.Min(initialTokenCount, containers.Count);
+        for (int i = 0; i < spawnCount; i++)
+        {
+            Container cell = containers[i];
+            int group = Random.Range(0, groupCount);
+            Token token = TokenSpawner.Instance.SpawnColoredToken(group, grid.CellToWorld(cell.OrderedCells[0]));
+            cell.TryAccept(token);
+        }
+    }
 }
