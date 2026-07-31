@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Variants;
 
 // Parking Jam (arrow-maze variant): every piece is a bent, self-avoiding body of cells (a plain
 // CellOffsets shape, same mechanism Block Puzzle already uses for non-rectangular pieces) with a
@@ -9,12 +10,16 @@ using UnityEngine;
 // piece with a clear lane now will still have one later (nothing ever repositions to block it),
 // which is exactly why solvability only needs a simple greedy check instead of a search over
 // joint piece positions.
-public class ParkingJamZone : MonoBehaviour
+//
+// No containers at all - escaping is pure Grid-level occupancy, not container membership - so
+// this rides Zone's shared setup (grid, board sizing) while opting out of containers/groups/bench
+// and using the generate/solve/commit hooks instead of the default single-pass GenerateTokens.
+public class ParkingJamZone : Zone
 {
     [SerializeField, Range(0f, 1f)] float fillRatio = 0.55f;
-    [SerializeField] int maxGenerationAttempts = 60;
     [SerializeField] int minLength = 2;
     [SerializeField] int maxLength = 8;
+    protected override int maxGenerationAttempts => 60;
 
     static readonly Vector2Int[] Directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
@@ -25,47 +30,34 @@ public class ParkingJamZone : MonoBehaviour
         public int group;
     }
 
-    void Start()
+    List<CarSpec> pendingLayout;
+
+    protected override List<Container> GenerateContainers() => new List<Container>();
+
+    protected override bool TryGenerateLayout()
     {
-        Grid grid = Grid.Instance;
         var bounds = new RectInt(0, 0, grid.Columns, grid.Rows);
-
-        List<CarSpec> layout = null;
-        for (int attempt = 0; attempt < maxGenerationAttempts; attempt++)
-        {
-            List<CarSpec> candidate = GenerateLayout(bounds);
-            if (candidate != null && IsSolvable(candidate))
-            {
-                layout = candidate;
-                break;
-            }
-        }
-
-        if (layout == null)
-        {
-            Debug.LogWarning("ParkingJamZone: no solvable layout found within the attempt budget; falling back to an empty board.");
-            layout = new List<CarSpec>();
-        }
-
-        foreach (CarSpec car in layout)
-        {
-            SpawnCar(car);
-        }
+        pendingLayout = GenerateLayout(bounds);
+        return pendingLayout != null;
     }
 
-    void SpawnCar(CarSpec car)
+    protected override bool IsSolvable() => IsSolvable(pendingLayout);
+
+    protected override void CommitLayout()
     {
-        Grid grid = Grid.Instance;
-        Vector2Int anchor = car.body[0];
-        var offsets = new List<Vector2Int>(car.body.Count);
-        foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor); //applies local offset
-
-        Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, grid.CellToWorld(anchor), offsets);
-        token.EscapeLane = car.escapeLane;
-
-        foreach (Vector2Int cell in car.body)
+        foreach (CarSpec car in pendingLayout)
         {
-            grid.SetOccupied(cell, true);
+            Vector2Int anchor = car.body[0];
+            var offsets = new List<Vector2Int>(car.body.Count);
+            foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor); //applies local offset
+
+            Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, grid.CellToWorld(anchor), offsets);
+            token.EscapeLane = car.escapeLane;
+
+            foreach (Vector2Int cell in car.body)
+            {
+                grid.SetOccupied(cell, true);
+            }
         }
     }
 
@@ -76,7 +68,7 @@ public class ParkingJamZone : MonoBehaviour
     {
         var cars = new List<CarSpec>();
         var occupied = new HashSet<Vector2Int>();
-        
+
         //builds shuffled list of coords
         var freeCells = new List<Vector2Int>();
         for (int y = bounds.yMin; y < bounds.yMax; y++)
@@ -87,7 +79,7 @@ public class ParkingJamZone : MonoBehaviour
             }
         }
         ContainerManager.Shuffle(freeCells);
-        
+
         //fills grid until targetFilled is reached
         int targetFilled = Mathf.RoundToInt(fillRatio * bounds.width * bounds.height); //percentage of grid to be filled
         foreach (Vector2Int cell in freeCells)
@@ -120,7 +112,7 @@ public class ParkingJamZone : MonoBehaviour
             Vector2Int? next = StepBody(head, direction, turnChance, bounds, occupied, body);
             if (!next.HasValue) break;
 
-            direction = next.Value - head; 
+            direction = next.Value - head;
             body.Add(next.Value);
         }
         foreach (Vector2Int cell in body) occupied.Add(cell);
@@ -137,7 +129,7 @@ public class ParkingJamZone : MonoBehaviour
     {
         //builds direction priority list instead of naively shuffling
         //which would otherwise make self collision much more probable, making longer tokens much less likely
-        var candidates = new List<Vector2Int>();  
+        var candidates = new List<Vector2Int>();
         if (Random.value < turnChance)
         {
             candidates.Add(Perpendicular(direction, true));
@@ -154,13 +146,13 @@ public class ParkingJamZone : MonoBehaviour
         foreach (Vector2Int candidateDir in candidates)
         {
             Vector2Int candidate = from + candidateDir;
-            
+
             //registers the first valid direction
             if (bounds.Contains(candidate) && !occupied.Contains(candidate) && !body.Contains(candidate))
             {
                 return candidate;
             }
-            
+
             //if invalid, try again with the direction of lower priority, aka the ones later in the candidate list
         }
         return null;
@@ -207,7 +199,7 @@ public class ParkingJamZone : MonoBehaviour
         }
 
         bool progress = true;
-        
+
         //keeps iterating over the list of remaining cars until there is none left
         while (progress && remaining.Count > 0)
         {

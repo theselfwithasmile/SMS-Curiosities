@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Variants;
 
 // Tile Connect (Onet-style, simplified): every tile-field cell is a single-cell container that
 // only ever loses its token via PathConnectInteraction, never gains one via ordinary drag
@@ -14,17 +15,17 @@ using UnityEngine;
 // The tile field is inset from the grid's own bounds, leaving an outer margin with no containers
 // at all - that margin is the shared "outside" corridor connecting all four edges, without which
 // edge tiles would have nowhere to route through at all.
-public class TileConnectZone : MonoBehaviour
+public class TileConnectZone : Zone
 {
     [SerializeField] int margin = 1;
-    [SerializeField] Color boardColor = Color.gray;
-
-    void Start()
+    protected override int maxGenerationAttempts => 60;
+    
+    Dictionary<Vector2Int, Container> cellLookup;
+    List<(Vector2Int a, Vector2Int b, int group)> pendingPairs;
+    
+    protected override List<Container> GenerateContainers()
     {
-        Grid grid = Grid.Instance;
-        ContainerManager containers = ContainerManager.Instance;
-
-		//leave the outermost grid layers to be empty to create room for dragging(?)
+        //leave the outermost grid layers to be empty to create room for dragging(?)
         int fieldWidth = Mathf.Max(2, grid.Columns - margin * 2);
         int fieldHeight = Mathf.Max(2, grid.Rows - margin * 2);
         if ((fieldWidth * fieldHeight) % 2 != 0) fieldWidth -= 1; // needs an even cell count to pair fully
@@ -34,12 +35,16 @@ public class TileConnectZone : MonoBehaviour
         //per-cell layout
         List<Container> cells = new PerTileLayout().Build(bounds, boardColor);
         new ContainerRuleSet { EntryConstraint = new NoEntryConstraint(), OccupantInteraction = new PathConnectInteraction() }.ApplyToAll(cells);
-        var cellLookup = new Dictionary<Vector2Int, Container>();
+        cellLookup = new Dictionary<Vector2Int, Container>();
         foreach (Container cell in cells) cellLookup[cell.OrderedCells[0]] = cell; //maps each (per-grid) container to the grid coords
 
-        
+        return cells;
+    }
+
+    protected override bool TryGenerateLayout()
+    {
         //pair generation
-        var pairs = new List<(Vector2Int a, Vector2Int b, int group)>();
+        pendingPairs = new List<(Vector2Int a, Vector2Int b, int group)>();
         var reserved = new HashSet<Vector2Int>();  //tracks cells already paired
         var order = new List<Vector2Int>(cellLookup.Keys);
         ContainerManager.Shuffle(order);
@@ -49,18 +54,28 @@ public class TileConnectZone : MonoBehaviour
             if (reserved.Contains(a)) continue;
 
             //runs a BFS through all reachable unreserved space
-            List<Vector2Int> candidates = ReachableTileCells(a, cellLookup, reserved);  
-            if (candidates.Count == 0) continue; //left unpaired, a rare acceptable leftover
+            List<Vector2Int> candidates = ReachableTileCells(a, cellLookup, reserved);
+            if (candidates.Count == 0) continue; //left unpaired this attempt
 
             Vector2Int b = candidates[Random.Range(0, candidates.Count)];  //picks random compatible partner
             reserved.Add(a);
             reserved.Add(b);
-            pairs.Add((a, b, nextGroup));
+            pendingPairs.Add((a, b, nextGroup));
             nextGroup++;
         }
 
-        //spawns token
-        foreach ((Vector2Int a, Vector2Int b, int group) in pairs)
+        return true;
+    }
+
+    // A board is only fully clearable if every cell has a partner - an unpaired leftover can never
+    // be cleared (PathConnectInteraction always needs two), so unlike the old "rare acceptable
+    // leftover" behaviour, that's a real solvability failure worth retrying with a fresh pairing
+    // order rather than silently accepting.
+    protected override bool IsSolvable() => pendingPairs.Count * 2 == cellLookup.Count;
+
+    protected override void CommitLayout()
+    {
+        foreach ((Vector2Int a, Vector2Int b, int group) in pendingPairs)
         {
             SeedToken(cellLookup[a], group, grid.CellToWorld(a));
             SeedToken(cellLookup[b], group, grid.CellToWorld(b));

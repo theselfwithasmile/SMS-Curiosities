@@ -1,15 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Variants;
 
 // Woodoku-style: one container per row + one per column (overlapping, via the multi-membership
 // lookup), tier-agnostic (geometry only, no entry constraint), clearing on full. Pieces are drawn
 // from a small canonical shape set and staged in the row just below the board, ready to drag.
-public class BlockPuzzleZone : MonoBehaviour
+public class BlockPuzzleZone : Zone
 {
-    [SerializeField] int boardSize = 5;
-    [SerializeField] int pieceCount = 3;
-    [SerializeField] Color boardColor = Color.gray;
-
     static readonly List<Vector2Int>[] Shapes =
     {
         new List<Vector2Int> { Vector2Int.zero },
@@ -19,32 +16,31 @@ public class BlockPuzzleZone : MonoBehaviour
         new List<Vector2Int> { Vector2Int.zero, Vector2Int.right, Vector2Int.up, Vector2Int.up + Vector2Int.right },
     };
 
-    void Start()
+    protected override List<Container> GenerateContainers()
     {
-        Grid grid = Grid.Instance;
-        ContainerManager containers = ContainerManager.Instance;
-        int size = Mathf.Min(boardSize, grid.Columns, grid.Rows - 1);
-
-        List<Container> board = new OrthogonalLayout().Build(new RectInt(0, 0, size, size), boardColor);
+        List<Container> board = new OrthogonalLayout().Build(new RectInt(0, 0, boardSize, boardSize), boardColor);
         new ContainerRuleSet
         {
             CompletionPredicate = new FullPredicate(),
             Resolution = new ClearResolution(),
         }.ApplyToAll(board);
 
-        
-        int stagingRow = size;
+        return board;
+    }
+
+    protected override void GenerateTokens()
+    {
+        int stagingRow = boardSize;
         int stageX = 0;
         for (int i = 0; i < pieceCount; i++)
         {
             List<Vector2Int> shape = Shapes[Random.Range(0, Shapes.Length)];
-            int group = Random.Range(0, 6);
             int width = ShapeWidth(shape);
 
             if (stageX + width > grid.Columns) break;
 
             Vector3 anchorWorld = grid.CellToWorld(new Vector2Int(stageX, stagingRow));
-            TokenSpawner.Instance.SpawnMultiCellToken(group, anchorWorld, shape);
+            TokenSpawner.Instance.SpawnMultiCellToken(groups[i], anchorWorld, shape);
 
             stageX += width + 1;
         }

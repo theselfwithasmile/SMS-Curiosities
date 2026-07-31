@@ -1,21 +1,16 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Variants;
 
-public class WaterSortZone : MonoBehaviour
+public class WaterSortZone : Zone
 {
     [SerializeField] int tubeCount = 3;
-    [SerializeField] int tubeCapacity = 3;
+    protected override int QuotaFactor => 3;  //tube capacity
+    protected override bool NeedsBench => true;
 
-    void Start()
+    protected override List<Container> GenerateContainers()
     {
-        Grid grid = Grid.Instance;
-        ContainerManager containers = ContainerManager.Instance;
-
-        int totalTokens = tubeCount * tubeCapacity;
-        int benchRows = Mathf.Max(1, Mathf.CeilToInt(totalTokens / (float)grid.Columns));
-        Container bench = containers.CreateFixedContainer(new RectInt(0, 0, grid.Columns, benchRows), Color.gray);
-
-        var tubeLayout = new RegionGrowthLayout(tubeCapacity, Vector2Int.up, 1f);
+        var tubeLayout = new RegionGrowthLayout(QuotaFactor, Vector2Int.up, 1f);
         var tubes = new List<Container>();
         for (int group = 0; group < tubeCount; group++)
         {
@@ -29,14 +24,16 @@ public class WaterSortZone : MonoBehaviour
             Resolution = new SpawnTokenResolution(bench),
         }.ApplyToAll(tubes);
 
-        List<int> groups = ContainerManager.BuildQuotaMatchedGroups(tubes.Count * tubeCapacity, tubes.Count, tubeCapacity);
-        ContainerManager.Shuffle(groups);
+        return tubes;
+    }
 
+    protected override void GenerateTokens()
+    {
         foreach (int group in groups)
         {
             Vector2Int cell = bench.NextAvailableCell();
             Token token = TokenSpawner.Instance.SpawnColoredToken(group, grid.CellToWorld(cell));
-            bench.TryAccept(token);
+            bench.TryAccept(token);  //places tokens into bench
         }
     }
 }
