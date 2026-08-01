@@ -15,7 +15,7 @@ using Variants;
 // The tile field is inset from the grid's own bounds, leaving an outer margin with no containers
 // at all - that margin is the shared "outside" corridor connecting all four edges, without which
 // edge tiles would have nowhere to route through at all.
-public class TileConnectZone : Zone
+public class TileConnectBaseZone : BaseZone
 {
     [SerializeField] int margin = 1;
     protected override int maxGenerationAttempts => 60;

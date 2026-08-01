@@ -5,7 +5,7 @@ using Variants;
 // Woodoku-style: one container per row + one per column (overlapping, via the multi-membership
 // lookup), tier-agnostic (geometry only, no entry constraint), clearing on full. Pieces are drawn
 // from a small canonical shape set and staged in the row just below the board, ready to drag.
-public class BlockPuzzleZone : Zone
+public class BlockPuzzleBaseZone : BaseZone
 {
     static readonly List<Vector2Int>[] Shapes =
     {

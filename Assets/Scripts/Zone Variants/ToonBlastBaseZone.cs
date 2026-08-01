@@ -8,7 +8,7 @@ using Variants;
 // in the bench. Group counts are quota-matched (each a multiple of minMatchSize) so the board is
 // guaranteed fully clearable - free rearrangement means any existing run is always reachable,
 // no solver needed (same reasoning as Water Sort's quota-matched supply).
-public class ToonBlastZone : Zone
+public class ToonBlastBaseZone : BaseZone
 {
     protected override int QuotaFactor => 3;  //min match capacity
 

@@ -14,7 +14,7 @@ using Variants;
 // No containers at all - escaping is pure Grid-level occupancy, not container membership - so
 // this rides Zone's shared setup (grid, board sizing) while opting out of containers/groups/bench
 // and using the generate/solve/commit hooks instead of the default single-pass GenerateTokens.
-public class ParkingJamZone : Zone
+public class ParkingJamBaseZone : BaseZone
 {
     [SerializeField, Range(0f, 1f)] float fillRatio = 0.55f;
     [SerializeField] int minLength = 2;

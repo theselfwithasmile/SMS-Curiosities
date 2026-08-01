@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Variants
 {
-    public abstract class Zone : MonoBehaviour
+    public abstract class BaseZone : MonoBehaviour
     {
         [SerializeField] protected int boardLength = 5;
         [SerializeField] protected int pieceCount = 3;

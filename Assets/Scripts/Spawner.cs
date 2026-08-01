@@ -6,7 +6,7 @@ using Variants;
 
 public class Spawner : MonoBehaviour
 {
-    [SerializeField] List<Zone> zones;
+    [SerializeField] List<BaseZone> zones;
 
     // Start is called before the first frame update
     void Start()
@@ -26,7 +26,7 @@ public class Spawner : MonoBehaviour
     void ActivateZone(int idx)
     {
         //disable all zone variants (they share one GameObject)
-        foreach (Zone zone in zones) zone.enabled = false;
+        foreach (BaseZone zone in zones) zone.enabled = false;
 
         //enable the requested one
         zones[idx].gameObject.SetActive(true);

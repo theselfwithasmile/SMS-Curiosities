@@ -6,7 +6,7 @@ using Variants;
 // Dragging a token onto a same-group/same-tier occupant combines them via MergeInteraction
 // instead of being rejected. Win condition is "some cell's occupant reached targetTier" rather
 // than "everything cleared", since merging can never empty the board on its own.
-public class MergeZone : Zone
+public class MergeBaseZone : BaseZone
 {
     [SerializeField] int initialTokenCount = 6;
     [SerializeField] int targetTier = 4;

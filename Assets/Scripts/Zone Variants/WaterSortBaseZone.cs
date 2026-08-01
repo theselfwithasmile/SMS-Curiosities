@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Variants;
 
-public class WaterSortZone : Zone
+public class WaterSortBaseZone : BaseZone
 {
     [SerializeField] int tubeCount = 3;
     protected override int QuotaFactor => 3;  //tube capacity
