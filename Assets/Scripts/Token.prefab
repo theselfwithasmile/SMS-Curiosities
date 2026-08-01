@@ -144,3 +144,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Group: 0
+  Tier: 0
+  CellOffsets:
+  - {x: 0, y: 0}
+  IsEscapePiece: 0
+  EscapeLane: []
+  EscapeDirection: {x: 0, y: 0}

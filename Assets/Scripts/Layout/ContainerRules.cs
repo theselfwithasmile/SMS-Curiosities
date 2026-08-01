@@ -59,10 +59,7 @@ public class ClearResolution : IResolution
 {
     public void Resolve(Container container)
     {
-        foreach (Token token in container.Members)
-        {
-            if (token != null) Object.Destroy(token.gameObject);
-        }
+        TweenRunner.Instance.ShrinkAndDestroySequential(container.Members);
         container.ClearMembers();
     }
 }
@@ -84,11 +81,7 @@ public class SpawnTokenResolution : IResolution
     {
         int group = container.Members.Count > 0 ? container.Members[0].Group : 0;
 
-        //destroy each member
-        foreach (Token member in container.Members)
-        {
-            if (member != null) Object.Destroy(member.gameObject);
-        }
+        TweenRunner.Instance.ShrinkAndDestroySequential(container.Members);
         container.ClearMembers();
 
         //spawn token on the destination container if it has space, otherwise spawn on the original container
@@ -117,16 +110,12 @@ public class MergeInteraction : IOccupantInteraction
         int group = incoming.Group;
         int nextTier = incoming.Tier + 1;
 
-        Object.Destroy(incoming.gameObject);
-        Object.Destroy(occupant.gameObject);
         // Deliberately Members.Clear(), not ClearMembers() - this always refills the same cell
-        // with the merged result right below, so revealing a buried layer here would collide with
-        // that (Merge doesn't use layering today, but the ordering matters if it ever does).
+        // with the merged result once the animation finishes, so revealing a buried layer here
+        // would collide with that (Merge doesn't use layering today, but the ordering matters if
+        // it ever does).
         container.Members.Clear();
-
-        Token merged = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(cell));
-        merged.Tier = nextTier;
-        container.TryAccept(merged);
+        MergeEffect.Play(incoming, occupant, container, cell, group, nextTier);
         return true;
     }
 }
@@ -152,10 +141,10 @@ public class SwapInteraction : IOccupantInteraction
         Vector2Int occupantCell = incomingOrigin.NextAvailableCell();
         container.TryRemove(occupant);
         incomingOrigin.TryAccept(occupant);
-        occupant.transform.position = Grid.Instance.CellToWorld(occupantCell);
+        TweenRunner.Instance.MoveTo(occupant.transform, Grid.Instance.CellToWorld(occupantCell));
 
         container.TryAccept(incoming);
-        incoming.transform.position = Grid.Instance.CellToWorld(container.OrderedCells[0]);
+        TweenRunner.Instance.MoveTo(incoming.transform, Grid.Instance.CellToWorld(container.OrderedCells[0]));
 
         CheckMatch(container);
         CheckMatch(incomingOrigin);
@@ -181,12 +170,14 @@ public class SwapInteraction : IOccupantInteraction
 
         if (claimed.Count < minMatchSize) return;
 
+        var matchedTokens = new List<Token>(claimed.Count);
         foreach (Container matched in claimed)
         {
             Token token = matched.Members[0];
             matched.Consume(token);
-            Object.Destroy(token.gameObject);
+            matchedTokens.Add(token);
         }
+        TweenRunner.Instance.ShrinkAndDestroySequential(matchedTokens);
 
         Vector2Int spawnCell = outputDestination.NextAvailableCell();
         Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
@@ -218,17 +209,19 @@ public class PathConnectInteraction : IOccupantInteraction
 
         Vector2Int origin = incomingOrigin.OrderedCells[0];
         Vector2Int target = container.OrderedCells[0];
-        if (!IsReachable(origin, target)) return false;
+        if (!TryFindPath(origin, target, out List<Vector2Int> path)) return false;
 
         container.Consume(occupant);
-        Object.Destroy(occupant.gameObject);
-        Object.Destroy(incoming.gameObject);
+        ConnectPathEffect.ShowThenDestroy(path, GameState.Instance.GroupColor(incoming.Group), occupant, incoming);
         return true;
     }
 
-    static bool IsReachable(Vector2Int origin, Vector2Int target)
+    // Same BFS as before, but reconstructed via cameFrom so the route can be drawn, not just
+    // proven to exist.
+    static bool TryFindPath(Vector2Int origin, Vector2Int target, out List<Vector2Int> path)
     {
         var visited = new HashSet<Vector2Int> { origin };
+        var cameFrom = new Dictionary<Vector2Int, Vector2Int>();
         var frontier = new Queue<Vector2Int>();
         frontier.Enqueue(origin);
 
@@ -237,13 +230,33 @@ public class PathConnectInteraction : IOccupantInteraction
             Vector2Int cell = frontier.Dequeue();
             foreach (Vector2Int neighbor in ContainerManager.Instance.Neighbors(cell))
             {
-                if (neighbor == target) return true;
+                if (neighbor == target)
+                {
+                    path = ReconstructPath(cameFrom, origin, cell);
+                    path.Add(target);
+                    return true;
+                }
                 if (visited.Contains(neighbor) || !IsPassable(neighbor)) continue;
                 visited.Add(neighbor);
+                cameFrom[neighbor] = cell;
                 frontier.Enqueue(neighbor);
             }
         }
+        path = null;
         return false;
+    }
+
+    static List<Vector2Int> ReconstructPath(Dictionary<Vector2Int, Vector2Int> cameFrom, Vector2Int origin, Vector2Int end)
+    {
+        var path = new List<Vector2Int> { end };
+        Vector2Int current = end;
+        while (current != origin)
+        {
+            current = cameFrom[current];
+            path.Add(current);
+        }
+        path.Reverse();
+        return path;
     }
 
     static bool IsPassable(Vector2Int cell)

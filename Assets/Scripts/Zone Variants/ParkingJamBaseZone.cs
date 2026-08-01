@@ -56,6 +56,7 @@ public class ParkingJamBaseZone : BaseZone
             token.IsEscapePiece = true;
             token.EscapeLane = car.escapeLane;
             token.EscapeDirection = car.direction;
+            token.ShowEscapeArrow();
 
             foreach (Vector2Int cell in car.body)
             {

@@ -10,6 +10,7 @@ using UnityEngine.EventSystems;
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     public Container CurrentContainer;
+    
     public int Group;
     public int Tier; // merge level only (2048-style) - never used for group/type matching
 
@@ -42,10 +43,52 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     Container originalContainer;
     float zDistance;
     bool dragAllowed;
+    Coroutine activeMoveTween;
+    Transform escapeArrow;
+
+    static Mesh arrowMesh;
 
     void Awake()
     {
         GetComponent<SpriteRenderer>().color = GameState.Instance.SecondaryGroupColor(Group);
+    }
+
+    // Parking Jam: a small triangle child pointing along EscapeDirection, sitting at the body's
+    // head cell (CellOffsets' last entry - ParkingJamBaseZone builds offsets in the same
+    // tail-to-head order as the car's body). Built procedurally, same as Grid/ContainerManager's
+    // own quads - there's no art asset for this yet, and one triangle doesn't need one.
+    public void ShowEscapeArrow()
+    {
+        if (arrowMesh == null) arrowMesh = BuildArrowMesh();
+
+        var arrowObject = new GameObject("EscapeArrow");
+        arrowObject.transform.SetParent(transform, false);
+
+        Vector2Int headOffset = CellOffsets[CellOffsets.Count - 1];
+        arrowObject.transform.localPosition = (Vector3)((Vector2)headOffset * Grid.Instance.CellSize);
+        arrowObject.transform.localRotation = Quaternion.FromToRotation(Vector3.up, new Vector3(EscapeDirection.x, EscapeDirection.y, 0f));
+        arrowObject.transform.localScale = Vector3.one * (Grid.Instance.CellSize * 0.5f);
+
+        var meshFilter = arrowObject.AddComponent<MeshFilter>();
+        meshFilter.mesh = arrowMesh;
+
+        var meshRenderer = arrowObject.AddComponent<MeshRenderer>();
+        meshRenderer.material = Grid.BuildMaterial(Color.white);
+        meshRenderer.sortingOrder = GetComponent<SpriteRenderer>().sortingOrder + 1;
+
+        escapeArrow = arrowObject.transform;
+    }
+
+    static Mesh BuildArrowMesh()
+    {
+        var vertices = new[]
+        {
+            new Vector3(-0.3f, -0.35f, 0f),
+            new Vector3(0.3f, -0.35f, 0f),
+            new Vector3(0f, 0.35f, 0f),
+        };
+        var triangles = new[] { 0, 1, 2 };
+        return Grid.BuildMesh("EscapeArrow", vertices, triangles);
     }
 
     // Layering: a buried token starts hidden and non-interactive (SetRevealed(false) right after
@@ -57,8 +100,22 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         GetComponent<Collider2D>().enabled = revealed;
     }
 
+    // Cancels any in-flight drop/revert tween before repositioning - otherwise a fast re-grab
+    // mid-tween leaves both it and the drag itself writing transform.position the same frame.
+    void MoveToSlot(Vector3 destination)
+    {
+        if (activeMoveTween != null) TweenRunner.Instance.StopCoroutine(activeMoveTween);
+        activeMoveTween = TweenRunner.Instance.MoveTo(transform, destination);
+    }
+
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (activeMoveTween != null)
+        {
+            TweenRunner.Instance.StopCoroutine(activeMoveTween);
+            activeMoveTween = null;
+        }
+
         originalPosition = transform.position;
         originalContainer = CurrentContainer;
 
@@ -66,6 +123,8 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         // check) - separate from whether the drop target will accept the token.
         dragAllowed = originalContainer == null || originalContainer.TryRemove(this);
         if (!dragAllowed) return;
+
+        TweenRunner.Instance.PickupPop(transform);
 
         Camera camera = EventCamera(eventData);
         zDistance = camera.WorldToScreenPoint(transform.position).z;
@@ -109,11 +168,11 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         if (candidates.Count > 0 && TryEnterAll(candidates, out Vector2Int targetCell))
         {
-            transform.position = Grid.Instance.CellToWorld(targetCell);
+            MoveToSlot(Grid.Instance.CellToWorld(targetCell));
         }
         else
         {
-            transform.position = originalPosition;
+            MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);
         }
     }
@@ -138,7 +197,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         bool draggedTowardExit = Vector2.Dot(worldDelta, escapeDirWorld) > 0f;
         if (!draggedTowardExit)
         {
-            transform.position = originalPosition;
+            MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);
             return;
         }
@@ -147,14 +206,21 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         {
             if (Grid.Instance.IsOccupied(cell))
             {
-                transform.position = originalPosition;
+                MoveToSlot(originalPosition);
                 originalContainer?.ForceAccept(this);
                 return;
             }
         }
 
         SetFootprintOccupied(anchor, false);
-        Destroy(gameObject);
+        if (escapeArrow != null)
+        {
+            TweenRunner.Instance.PulseThenShrinkAndDestroy(this, escapeArrow);
+        }
+        else
+        {
+            TweenRunner.Instance.ShrinkAndDestroy(this);
+        }
     }
 
     void SetFootprintOccupied(Vector2Int anchor, bool occupied)
@@ -191,11 +257,11 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);
         if (TokenSpawner.Instance.TryClaimFootprint(this, anchor, CellOffsets))
         {
-            transform.position = Grid.Instance.CellToWorld(anchor);
+            MoveToSlot(Grid.Instance.CellToWorld(anchor));
         }
         else
         {
-            transform.position = originalPosition;
+            MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);
         }
     }

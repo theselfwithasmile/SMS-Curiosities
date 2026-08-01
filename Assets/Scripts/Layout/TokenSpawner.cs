@@ -2,10 +2,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public class AnimationGroup
+{
+    public List<AnimationClip> clips;
+}
+
+
 public class TokenSpawner : MonoBehaviour
 {
     public static TokenSpawner Instance;
     [SerializeField] private Token tokenPrefab;
+    [SerializeField] private List<AnimationGroup> animations;
     
     void Awake()
     {

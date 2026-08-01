@@ -188,6 +188,7 @@ public class Container
         Token next = BuriedTokens.Dequeue();
         next.SetRevealed(true);
         next.transform.position = Grid.Instance.CellToWorld(OrderedCells[Members.Count]);
+        TweenRunner.Instance.GrowIn(next.transform);
         ForceAccept(next);
     }
 }
