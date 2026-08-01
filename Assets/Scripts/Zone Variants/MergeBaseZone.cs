@@ -35,6 +35,18 @@ public class MergeBaseZone : BaseZone
         return cells;
     }
 
+    // Board-cleared (BaseZone's default) can never happen here - merging only ever consolidates
+    // tokens onto fewer cells, never empties the board outright - so this reports the win the
+    // moment any cell's occupant reaches the target tier instead.
+    protected override bool CheckWinCondition()
+    {
+        foreach (Container cell in containers)
+        {
+            if (cell.Members.Count > 0 && cell.Members[0].Tier >= effectiveTargetTier) return true;
+        }
+        return false;
+    }
+
     // initialTokenCount and targetTier used to be independent, so the win condition was often
     // mathematically unreachable (tier 4 needs 16 same-group tokens merged together, but 6 tokens
     // spread randomly across several groups essentially never share that many). One randomly
@@ -44,7 +56,8 @@ public class MergeBaseZone : BaseZone
     protected override void GenerateTokens()
     {
         int requiredForWin = 1 << effectiveTargetTier;
-        int spawnCount = Mathf.Min(Mathf.Max(initialTokenCount, requiredForWin), containers.Count);
+        int scaledInitial = Scaled(initialTokenCount, spawnGrowthPerLevel);
+        int spawnCount = Mathf.Min(Mathf.Max(scaledInitial, requiredForWin), containers.Count);
 
         int winningGroup = Random.Range(0, groupCount);
         var tokenGroups = new List<int>(spawnCount);

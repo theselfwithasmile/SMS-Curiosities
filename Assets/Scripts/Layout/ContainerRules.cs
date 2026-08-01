@@ -242,6 +242,27 @@ public class PathConnectInteraction : IOccupantInteraction
     }
 }
 
+// Runs an inner resolution then an extra callback - lets a zone piggyback tracking (e.g. Block
+// Puzzle's clear-count win quota) onto a shared resolution like ClearResolution without needing a
+// bespoke IResolution of its own just to add one counter increment.
+public class CompositeResolution : IResolution
+{
+    readonly IResolution inner;
+    readonly System.Action onResolved;
+
+    public CompositeResolution(IResolution inner, System.Action onResolved)
+    {
+        this.inner = inner;
+        this.onResolved = onResolved;
+    }
+
+    public void Resolve(Container container)
+    {
+        inner?.Resolve(container);
+        onResolved?.Invoke();
+    }
+}
+
 public class LogResolution : IResolution
 {
     public void Resolve(Container container)

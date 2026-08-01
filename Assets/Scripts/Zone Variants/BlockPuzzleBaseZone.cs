@@ -21,14 +21,24 @@ public class BlockPuzzleBaseZone : BaseZone
     // 2 rows (not 1) since the tallest canonical shapes above are 2 cells tall.
     protected override int ExtraReservedRows => 2;
 
+    // Board-cleared (BaseZone's default) doesn't apply here - rows/columns clear their members but
+    // stay on the board forever, ready to accept more pieces, so the board is never actually
+    // "done". The win objective instead is a target number of row/column clears, scaling with
+    // difficulty the same way other zones scale their spawn counts.
+    [SerializeField] int targetClears = 10;
+    int clearsCompleted = 0;
+
     // Tracks the current batch so Update() can tell when every staged piece has been placed
     // (TryClaimFootprint destroys the original token on a successful placement - see
     // TokenSpawner - so Unity's overloaded null-check on a placed entry reads as null here) and
     // spawn a fresh batch. Without this the zone only ever had the first 3 pieces to work with.
     readonly List<Token> stagedPieces = new List<Token>();
 
-    void Update()
+    protected override void Update()
     {
+        base.Update(); // may report the win/lose outcome this frame
+        if (zoneEnded || !IsPlaying) return;
+
         if (stagedPieces.Count == 0) return;
 
         foreach (Token piece in stagedPieces)
@@ -44,10 +54,61 @@ public class BlockPuzzleBaseZone : BaseZone
         new ContainerRuleSet
         {
             CompletionPredicate = new FullPredicate(),
-            Resolution = new ClearResolution(),
+            Resolution = new CompositeResolution(new ClearResolution(), () => clearsCompleted++),
         }.ApplyToAll(board);
 
         return board;
+    }
+
+    protected override bool CheckWinCondition() => clearsCompleted >= Scaled(targetClears, spawnGrowthPerLevel);
+
+    // A loss here is "the current batch has a piece left, and none of the still-unplaced pieces
+    // fit anywhere on the board" - checked against every remaining piece rather than stopping at
+    // the first, since one boxed-in piece next to a perfectly placeable one isn't game over.
+    protected override bool CheckLoseCondition()
+    {
+        bool anyUnplaced = false;
+        foreach (Token piece in stagedPieces)
+        {
+            if (piece == null) continue; // already placed
+            anyUnplaced = true;
+            if (CanPlaceAnywhere(piece.CellOffsets)) return false;
+        }
+        return anyUnplaced;
+    }
+
+    bool CanPlaceAnywhere(List<Vector2Int> offsets)
+    {
+        for (int y = 0; y < boardSize; y++)
+        {
+            for (int x = 0; x < boardSize; x++)
+            {
+                if (CanPlaceAt(new Vector2Int(x, y), offsets)) return true;
+            }
+        }
+        return false;
+    }
+
+    // Same atomic-footprint capacity check TokenSpawner.TryClaimFootprint uses to actually commit a
+    // placement, just without committing - board containers have no EntryConstraint, so capacity is
+    // the whole story.
+    bool CanPlaceAt(Vector2Int anchor, List<Vector2Int> offsets)
+    {
+        var pendingCounts = new Dictionary<Container, int>();
+        foreach (Vector2Int offset in offsets)
+        {
+            Vector2Int cell = anchor + offset;
+            IReadOnlyList<Container> owners = ContainerManager.Instance.GetContainersAt(cell);
+            if (owners.Count == 0) return false;
+
+            foreach (Container container in owners)
+            {
+                pendingCounts.TryGetValue(container, out int pending);
+                if (container.Members.Count + pending >= container.Capacity) return false;
+                pendingCounts[container] = pending + 1;
+            }
+        }
+        return true;
     }
 
     protected override void GenerateTokens() => SpawnBatch();
@@ -58,7 +119,8 @@ public class BlockPuzzleBaseZone : BaseZone
 
         int stagingRow = boardSize;
         int stageX = 0;
-        for (int i = 0; i < pieceCount; i++)
+        int effectivePieceCount = Scaled(pieceCount, spawnGrowthPerLevel);
+        for (int i = 0; i < effectivePieceCount; i++)
         {
             List<Vector2Int> shape = Shapes[Random.Range(0, Shapes.Length)];
             int width = ShapeWidth(shape);

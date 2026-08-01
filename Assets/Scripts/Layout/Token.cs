@@ -40,6 +40,11 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // shouldn't let ANY drag, in any direction or distance, trigger an escape).
     public Vector2Int EscapeDirection;
 
+    // Fired right as this piece clears its lane and leaves the board - ParkingJamBaseZone uses it
+    // to track how many cars are still in play for its win check, without Token needing to know
+    // anything about zones or win conditions itself.
+    public System.Action OnEscaped;
+
     Vector3 pointerOffset;
     Vector3 originalPosition;
     Container originalContainer;
@@ -192,6 +197,16 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        // Once a zone has reported an outcome (or before Playing even starts, e.g. still on the
+        // menu) the board underneath a Won/Lost/Menu panel must stop responding on its own -
+        // relying on the panel to visually cover it isn't enough, since UI raycast blocking is a
+        // scene/graphic-raycaster setup detail, not something this script controls.
+        if (GameFlowManager.Instance != null && GameFlowManager.Instance.State != FlowState.Playing)
+        {
+            dragAllowed = false;
+            return;
+        }
+
         if (activeMoveTween != null)
         {
             TweenRunner.Instance.StopCoroutine(activeMoveTween);
@@ -300,6 +315,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
 
         SetFootprintOccupied(anchor, false);
+        OnEscaped?.Invoke();
         if (escapeArrow != null)
         {
             TweenRunner.Instance.PulseThenShrinkAndDestroy(this, escapeArrow);

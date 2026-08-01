@@ -32,20 +32,37 @@ public class ParkingJamBaseZone : BaseZone
     }
 
     List<CarSpec> pendingLayout;
+    int remainingCars;
+
+    // Difficulty here has no natural "count" field to scale (cars come from filling free cells,
+    // not a fixed spec list) - nudging the fill ratio itself is the equivalent knob. Clamped well
+    // short of 1 so generation (which retries up to maxGenerationAttempts on an unsolvable pack)
+    // doesn't start starving for free cells to grow escape lanes through.
+    float EffectiveFillRatio => Mathf.Clamp(fillRatio + Difficulty * 0.03f, 0f, 0.85f);
 
     protected override List<Container> GenerateContainers() => new List<Container>();
 
     protected override bool TryGenerateLayout()
     {
-        var bounds = new RectInt(0, 0, grid.Columns, grid.Rows);
+        // boardSize (not the raw grid dimensions) so difficulty's board-growth scaling actually
+        // reaches this zone too - it has no containers/bench to size against, so without this it
+        // was always filling the scene's fixed inspector grid size regardless of boardLength.
+        var bounds = new RectInt(0, 0, boardSize, boardSize);
         pendingLayout = GenerateLayout(bounds);
         return pendingLayout != null;
     }
 
     protected override bool IsSolvable() => IsSolvable(pendingLayout);
 
+    // Board-cleared (BaseZone's default) always reads false here since Parking Jam never uses
+    // Container at all (see the class comment above) - win is "every car has escaped" instead,
+    // tracked via the count set in CommitLayout and decremented by each token's OnEscaped.
+    protected override bool CheckWinCondition() => remainingCars <= 0;
+
     protected override void CommitLayout()
     {
+        remainingCars = pendingLayout.Count;
+
         foreach (CarSpec car in pendingLayout)
         {
             Vector2Int anchor = car.body[0];
@@ -56,6 +73,7 @@ public class ParkingJamBaseZone : BaseZone
             token.IsEscapePiece = true;
             token.EscapeLane = car.escapeLane;
             token.EscapeDirection = car.direction;
+            token.OnEscaped += () => remainingCars--;
             token.ShowEscapeArrow();
 
             foreach (Vector2Int cell in car.body)
@@ -85,7 +103,7 @@ public class ParkingJamBaseZone : BaseZone
         ContainerManager.Shuffle(freeCells);
 
         //fills grid until targetFilled is reached
-        int targetFilled = Mathf.RoundToInt(fillRatio * bounds.width * bounds.height); //percentage of grid to be filled
+        int targetFilled = Mathf.RoundToInt(EffectiveFillRatio * bounds.width * bounds.height); //percentage of grid to be filled
         foreach (Vector2Int cell in freeCells)
         {
             if (occupied.Count >= targetFilled) break;

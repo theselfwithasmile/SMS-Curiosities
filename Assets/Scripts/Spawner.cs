@@ -11,7 +11,14 @@ public class Spawner : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        ActivateZone(GameState.Instance.currZoneIdx);
+        // Gated on GameFlowManager so a fresh load lands on the menu instead of dropping straight
+        // into a zone - absent (not yet wired into the scene), falls back to the old always-on
+        // behaviour. A reload triggered mid-game (R-key zone cycling, Retry, Next Level) already
+        // carries State == Playing across on GameFlowManager's DontDestroyOnLoad instance.
+        if (GameFlowManager.Instance == null || GameFlowManager.Instance.State == FlowState.Playing)
+        {
+            ActivateZone(GameState.Instance.currZoneIdx);
+        }
     }
 
     // Update is called once per frame

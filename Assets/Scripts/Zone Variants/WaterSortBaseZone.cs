@@ -6,13 +6,18 @@ public class WaterSortBaseZone : BaseZone
 {
     [SerializeField] int tubeCount = 3;
     protected override int QuotaFactor => 3;  //tube capacity
-    protected override int BenchCapacity => tubeCount * QuotaFactor;
+
+    // Water Sort's containers come from tubeCount directly rather than boardSize, so difficulty
+    // scaling needs to touch this rather than relying on the board-growth default to do it for free.
+    int EffectiveTubeCount => Scaled(tubeCount, spawnGrowthPerLevel);
+
+    protected override int BenchCapacity => EffectiveTubeCount * QuotaFactor;
 
     protected override List<Container> GenerateContainers()
     {
         var tubeLayout = new RegionGrowthLayout(QuotaFactor, Vector2Int.up, 1f);
         var tubes = new List<Container>();
-        for (int group = 0; group < tubeCount; group++)
+        for (int group = 0; group < EffectiveTubeCount; group++)
         {
             tubes.AddRange(tubeLayout.Build(default, GameState.Instance.GroupColor(group)));
         }
@@ -35,7 +40,8 @@ public class WaterSortBaseZone : BaseZone
     // number of groups.
     protected override List<int> GenerateGroups()
     {
-        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(tubeCount * QuotaFactor, tubeCount, QuotaFactor);
+        int effectiveTubeCount = EffectiveTubeCount;
+        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(effectiveTubeCount * QuotaFactor, effectiveTubeCount, QuotaFactor);
         ContainerManager.Shuffle(tokenGroups);
         return tokenGroups;
     }
