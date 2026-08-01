@@ -9,11 +9,6 @@ public class GroupMatchConstraint : IEntryConstraint
     }
 }
 
-// Blocks all normal entry - for cells that should only ever be seeded once at generation
-// (bypassing TryAccept directly) and afterward only lose tokens via an occupant interaction,
-// never gain one via an ordinary drag onto an empty cell (Tile Connect: without this, a player
-// could freely relocate tiles into empty cells to manufacture connections that don't naturally
-// exist, collapsing the puzzle into free rearrangement).
 public class NoEntryConstraint : IEntryConstraint
 {
     public bool CanAccept(Token token, Container container) => false;
@@ -29,9 +24,6 @@ public class EmptyPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count == 0;
 }
 
-// Merge's win condition can't be "empty" (a merge consumes 2 and produces 1, so a cell never
-// reaches zero occupants on its own) - checked locally per cell instead of globally, since a
-// merge's result is TryAccept-ed back into the same single-cell container that triggered it.
 public class TierReachedPredicate : ICompletionPredicate
 {
     readonly int targetTier;
@@ -44,17 +36,6 @@ public class TierReachedPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count > 0 && container.Members[0].Tier >= targetTier;
 }
 
-public class LogResolution : IResolution
-{
-    public void Resolve(Container container)
-    {
-        if (container.Members.Count > 0)
-        {
-            Debug.Log($"Reached tier {container.Members[0].Tier}!");
-        }
-    }
-}
-
 public class ClearResolution : IResolution
 {
     public void Resolve(Container container)
@@ -64,8 +45,7 @@ public class ClearResolution : IResolution
     }
 }
 
-// Consumes a completed container's members and spawns one token (same group) into a destination
-// container - the "completed container becomes a grouped token" resolution.
+//consumes a completed container's members and spawns one token into a destination
 public class SpawnTokenResolution : IResolution
 {
     readonly Container destination;
@@ -98,8 +78,6 @@ public class SpawnTokenResolution : IResolution
     }
 }
 
-// Merge (2048-style): dropping onto a same-group, same-tier occupant combines them into one
-// higher-tier token in place, instead of the drop being rejected outright.
 public class MergeInteraction : IOccupantInteraction
 {
     public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
@@ -109,18 +87,14 @@ public class MergeInteraction : IOccupantInteraction
         Vector2Int cell = container.OrderedCells[0];
         int group = incoming.Group;
         int nextTier = incoming.Tier + 1;
-
-        // Deliberately Members.Clear(), not ClearMembers() - this always refills the same cell
-        // with the merged result once the animation finishes, so revealing a buried layer here
-        // would collide with that (Merge doesn't use layering today, but the ordering matters if
-        // it ever does).
+        
         container.Members.Clear();
         MergeEffect.Play(incoming, occupant, container, cell, group, nextTier);
         return true;
     }
 }
 
-// Toon Blast-style free rearrangement: dropping onto a different-group occupant swaps the two
+//dropping onto a different-group occupant swaps the two
 // tokens instead of being rejected, then flood-fills same-group neighbors from both affected
 // cells and clears any run of minMatchSize+ into one grouped output token.
 public class SwapInteraction : IOccupantInteraction
@@ -160,6 +134,7 @@ public class SwapInteraction : IOccupantInteraction
         var frontier = new List<Container>();
         AddSameGroupNeighbors(cell, group, claimed, frontier);
 
+        //adds all same group tokens adjacent to the cell and its neighbors
         while (frontier.Count > 0)
         {
             Container next = frontier[frontier.Count - 1];
@@ -170,6 +145,7 @@ public class SwapInteraction : IOccupantInteraction
 
         if (claimed.Count < minMatchSize) return;
 
+        //registers and destroys said tokens
         var matchedTokens = new List<Token>(claimed.Count);
         foreach (Container matched in claimed)
         {
@@ -197,10 +173,8 @@ public class SwapInteraction : IOccupantInteraction
     }
 }
 
-// Tile Connect (simplified - no turn limit, deferred for later): dropping a token onto a
-// same-group occupant clears both if a collision-free route exists between the token's origin
-// cell and the occupant's cell, walking through any cell with no container (the outer routing
-// margin) or an empty one (a cell whose tile has already been cleared).
+//dropping a token onto a same-group occupant clears both if a collision-free route
+//exists between the token's origin cell and the occupant's cell (turn limit to be implemented)
 public class PathConnectInteraction : IOccupantInteraction
 {
     public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
@@ -216,8 +190,7 @@ public class PathConnectInteraction : IOccupantInteraction
         return true;
     }
 
-    // Same BFS as before, but reconstructed via cameFrom so the route can be drawn, not just
-    // proven to exist.
+    //reconstructs BFS via cameFrom so the route can be drawn
     static bool TryFindPath(Vector2Int origin, Vector2Int target, out List<Vector2Int> path)
     {
         var visited = new HashSet<Vector2Int> { origin };
@@ -266,5 +239,16 @@ public class PathConnectInteraction : IOccupantInteraction
             if (container.Members.Count > 0) return false;
         }
         return true;
+    }
+}
+
+public class LogResolution : IResolution
+{
+    public void Resolve(Container container)
+    {
+        if (container.Members.Count > 0)
+        {
+            Debug.Log($"Reached tier {container.Members[0].Tier}!");
+        }
     }
 }

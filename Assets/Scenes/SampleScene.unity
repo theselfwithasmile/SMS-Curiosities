@@ -219,6 +219,7 @@ MonoBehaviour:
   boardLength: 5
   pieceCount: 3
   boardColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  maxLayers: 2
 --- !u!1 &336881740
 GameObject:
   m_ObjectHideFlags: 0
@@ -270,6 +271,8 @@ GameObject:
   - component: {fileID: 414790133}
   - component: {fileID: 414790134}
   - component: {fileID: 414790136}
+  - component: {fileID: 414790137}
+  - component: {fileID: 414790138}
   m_Layer: 0
   m_Name: Grid Manager
   m_TagString: Untagged
@@ -291,8 +294,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   columns: 8
   rows: 8
-  dotScale: 0.1
-  dotColor: {r: 1, g: 1, b: 1, a: 1}
   viewportPadding: 0.05
 --- !u!4 &414790132
 Transform:
@@ -385,6 +386,48 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tokenPrefab: {fileID: 7267781291361426296, guid: 2cdcf9fb4a963ef46acbed1a2b005c1e, type: 3}
+  animations:
+  - clips:
+    - {fileID: 7400000, guid: 1fc702a93c130084e8cd669b58d0fa99, type: 2}
+    - {fileID: 7400000, guid: 97c6569755474754ba3ee9ddc4c01963, type: 2}
+    - {fileID: 7400000, guid: c2f4882e4a56f5241a94515e537fa5cd, type: 2}
+    - {fileID: 7400000, guid: 0a6860047ab7b5f4aa0ca2f228747d3e, type: 2}
+    - {fileID: 7400000, guid: 890bed798f2a2124f85625d1edfd6fc8, type: 2}
+--- !u!95 &414790137
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 414790130}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 1746867a3faf95543bfbf5f3dbe5cb13, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &414790138
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 414790130}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8649d4c81a6aa5947a33c1bf1e923e6f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  dotScale: 0.1
+  dotColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &503054022
 GameObject:
   m_ObjectHideFlags: 0
@@ -931,51 +974,6 @@ MonoBehaviour:
   boardColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   initialTokenCount: 6
   targetTier: 4
---- !u!1 &1976346752
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1976346754}
-  - component: {fileID: 1976346755}
-  m_Layer: 0
-  m_Name: Level Spawner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &1976346754
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976346752}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1976346755
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976346752}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 426e991b00d80d84094899ad8fe0a1ef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  zones: []
 --- !u!1 &2072011647
 GameObject:
   m_ObjectHideFlags: 0
@@ -1027,7 +1025,7 @@ MonoBehaviour:
   - {fileID: 172039764}
   - {fileID: 503054024}
   - {fileID: 331776023}
-  - {fileID: 0}
+  - {fileID: 1773291091}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1035,7 +1033,6 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 619394802}
   - {fileID: 692221159}
-  - {fileID: 1976346754}
   - {fileID: 414790132}
   - {fileID: 2072011649}
   - {fileID: 1857024230}

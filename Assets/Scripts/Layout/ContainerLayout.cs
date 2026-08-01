@@ -1,13 +1,12 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-// What containers exist when a zone starts - called once, upfront, from a zone's Start().
+//what containers exist when a zone starts
 public interface IContainerLayout
 {
     List<Container> Build(RectInt bounds, Color color);
 }
 
-// One container per cell in bounds (Merge, Toon Blast).
 public class PerTileLayout : IContainerLayout
 {
     public List<Container> Build(RectInt bounds, Color color)
@@ -25,7 +24,7 @@ public class PerTileLayout : IContainerLayout
     }
 }
 
-// One container per row plus one per column, overlapping via multi-membership (Block Puzzle).
+//one container per row plus one per column
 public class OrthogonalLayout : IContainerLayout
 {
     public List<Container> Build(RectInt bounds, Color color)
@@ -48,13 +47,7 @@ public class OrthogonalLayout : IContainerLayout
 // axisBias (e.g. Vector2Int.up) with biasStrength > 0 skews growth along an axis - strong bias
 // produces tube/lane shapes, no bias produces blobs.
 //
-// Unlike the other two layouts, this builds exactly one container per call rather than deriving
-// a count from bounds - callers needing several (e.g. one tube per color) call Build once per
-// container, since each one typically wants its own distinct color anyway.
-//
-// Known gap: ContainerManager.GenerateContainer always searches the whole grid internally, not
-// this bounds parameter - fine today since every zone using this owns the whole grid anyway, but
-// worth fixing if a future zone needs region growth confined to a sub-region of a shared board.
+
 public class RegionGrowthLayout : IContainerLayout
 {
     readonly int capacity;
@@ -68,6 +61,7 @@ public class RegionGrowthLayout : IContainerLayout
         this.biasStrength = biasStrength;
     }
 
+    //builds exactly one container per call rather than deriving
     public List<Container> Build(RectInt bounds, Color color)
     {
         Container container = ContainerManager.Instance.GenerateContainer(capacity, color, axisBias, biasStrength);

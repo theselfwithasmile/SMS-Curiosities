@@ -21,6 +21,23 @@ public class BlockPuzzleBaseZone : BaseZone
     // 2 rows (not 1) since the tallest canonical shapes above are 2 cells tall.
     protected override int ExtraReservedRows => 2;
 
+    // Tracks the current batch so Update() can tell when every staged piece has been placed
+    // (TryClaimFootprint destroys the original token on a successful placement - see
+    // TokenSpawner - so Unity's overloaded null-check on a placed entry reads as null here) and
+    // spawn a fresh batch. Without this the zone only ever had the first 3 pieces to work with.
+    readonly List<Token> stagedPieces = new List<Token>();
+
+    void Update()
+    {
+        if (stagedPieces.Count == 0) return;
+
+        foreach (Token piece in stagedPieces)
+        {
+            if (piece != null) return; // at least one piece still unplaced - wait
+        }
+        SpawnBatch();
+    }
+
     protected override List<Container> GenerateContainers()
     {
         List<Container> board = new OrthogonalLayout().Build(new RectInt(0, 0, boardSize, boardSize), boardColor);
@@ -33,8 +50,12 @@ public class BlockPuzzleBaseZone : BaseZone
         return board;
     }
 
-    protected override void GenerateTokens()
+    protected override void GenerateTokens() => SpawnBatch();
+
+    void SpawnBatch()
     {
+        stagedPieces.Clear();
+
         int stagingRow = boardSize;
         int stageX = 0;
         for (int i = 0; i < pieceCount; i++)
@@ -49,7 +70,8 @@ public class BlockPuzzleBaseZone : BaseZone
             // matched against board CELLS for an unrelated purpose (and doesn't even apply here,
             // since these board containers have no group entry constraint), and is sized to
             // containerCount, not pieceCount, so indexing it by staged-piece index was fragile.
-            TokenSpawner.Instance.SpawnMultiCellToken(Random.Range(0, groupCount), anchorWorld, shape);
+            Token piece = TokenSpawner.Instance.SpawnMultiCellToken(Random.Range(0, groupCount), anchorWorld, shape);
+            stagedPieces.Add(piece);
 
             stageX += width + 1;
         }

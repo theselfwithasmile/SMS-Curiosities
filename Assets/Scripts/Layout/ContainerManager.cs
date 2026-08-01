@@ -12,30 +12,21 @@ public class ContainerManager : MonoBehaviour
     public readonly List<Container> Containers = new List<Container>();
     readonly Dictionary<Vector2Int, List<Container>> cellMemberships = new Dictionary<Vector2Int, List<Container>>();
     static readonly List<Container> NoContainers = new List<Container>();
-
-    Mesh quadMesh;
     readonly Dictionary<Container, Material> containerMaterials = new Dictionary<Container, Material>();
 
     void Awake()
     {
         Instance = this;
-        quadMesh = BuildQuadMesh();
     }
-
-    void Update()
-    {
-        DrawContainers();
-    }
-
+    
     public IReadOnlyList<Container> GetContainersAt(Vector2Int cell)
     {
         return cellMemberships.TryGetValue(cell, out List<Container> list) ? list : NoContainers;
     }
-    
 
-    // Partitions totalCount into groupCount buckets, each a multiple of chunkSize, so a zone
-    // built from the result is guaranteed fully clearable/fillable by construction (Water Sort's
-    // per-tube supply, Toon Blast's per-group cell counts - same operation, different chunk size).
+    public Material GetMaterial(Container container) => containerMaterials[container];
+    
+    //partitions totalCount into groupCount buckets, each a multiple of chunkSize
     public static List<int> BuildQuotaMatchedGroups(int totalCount, int groupCount, int chunkSize)
     {
         var groups = new List<int>(totalCount);
@@ -46,9 +37,7 @@ public class ContainerManager : MonoBehaviour
             for (int i = 0; i < perGroup; i++) groups.Add(group);
         }
 
-        // Rounding leftovers get distributed as full chunks across random groups, keeping every
-        // group's count a clean multiple. Anything smaller than chunkSize left after that can't
-        // form a guaranteed-complete group - folded in as a rare, acceptable straggler.
+        //rounding leftovers get distributed as full chunks across random groups
         int remaining = totalCount - groups.Count;
         while (remaining >= chunkSize)
         {
@@ -56,6 +45,8 @@ public class ContainerManager : MonoBehaviour
             for (int i = 0; i < chunkSize; i++) groups.Add(group);
             remaining -= chunkSize;
         }
+        
+        //anything smaller than chunkSize left is folded in as a rare, acceptable straggler.
         for (int i = 0; i < remaining; i++)
         {
             groups.Add(Random.Range(0, groupCount));
@@ -72,9 +63,7 @@ public class ContainerManager : MonoBehaviour
             (list[i], list[j]) = (list[j], list[i]);
         }
     }
-
-    // Claims an exact rectangular region rather than growing randomly - for deliberately placed
-    // regions (e.g. the bench) rather than procedurally shaped puzzle containers.
+    
     public Container CreateFixedContainer(RectInt bounds, Color color)
     {
         var cells = new List<Vector2Int>();
@@ -93,6 +82,8 @@ public class ContainerManager : MonoBehaviour
     {
         Containers.Remove(container);
         containerMaterials.Remove(container);
+        
+        //removes container's cells
         foreach (Vector2Int cell in container.Cells)
         {
             if (cellMemberships.TryGetValue(cell, out List<Container> owners))
@@ -107,12 +98,11 @@ public class ContainerManager : MonoBehaviour
         }
     }
 
-    // Randomized region growth: claims a random unclaimed seed cell, then repeatedly claims a
-    // random neighboring cell of the claimed region until it reaches the target capacity.
-    // axisBias (e.g. Vector2Int.up) with biasStrength > 0 skews growth along that axis, which is
-    // how the same algorithm produces both blobs (no bias) and tubes/lanes (strong axis bias).
+    //Randomized region growth: claims a random unclaimed seed cell, then repeatedly claims a
+    // random neighboring cell of the claimed region until it reaches the target capacity
     public Container GenerateContainer(int capacity, Color color, Vector2Int axisBias = default, float biasStrength = 0f)
     {
+        //init unclaimed list
         var unclaimed = new List<Vector2Int>();
         for (int y = 0; y < Grid.Instance.Rows; y++)
         {
@@ -124,12 +114,14 @@ public class ContainerManager : MonoBehaviour
         }
         if (unclaimed.Count == 0) return null;
 
+        //seeds unclaimed cells
         Vector2Int seed = unclaimed[Random.Range(0, unclaimed.Count)];
         var claimed = new HashSet<Vector2Int> { seed };
         var orderedClaimed = new List<Vector2Int> { seed };
         var frontier = new List<Vector2Int>();
-        AddFrontier(seed, claimed, frontier);
+        AddFrontier(seed, claimed, frontier); //fills neighbor list
 
+        //fills unclaimed list
         while (claimed.Count < capacity && frontier.Count > 0)
         {
             int index = PickFrontierIndex(frontier, seed, axisBias, biasStrength);
@@ -142,6 +134,7 @@ public class ContainerManager : MonoBehaviour
             AddFrontier(next, claimed, frontier);
         }
 
+        //commits container
         return RegisterContainer(orderedClaimed, color);
     }
 
@@ -159,12 +152,13 @@ public class ContainerManager : MonoBehaviour
             owners.Add(container);
             Grid.Instance.SetOccupied(cell, true);
         }
-        containerMaterials[container] = Grid.BuildMaterial(color);
+        containerMaterials[container] = GridRenderer.BuildMaterial(color);
         return container;
     }
 
     void AddFrontier(Vector2Int cell, HashSet<Vector2Int> claimed, List<Vector2Int> frontier)
     {
+        //checks neighbors' occupancy 
         foreach (Vector2Int neighbor in Neighbors(cell))
         {
             if (!claimed.Contains(neighbor) && !cellMemberships.ContainsKey(neighbor) && !frontier.Contains(neighbor))
@@ -176,6 +170,7 @@ public class ContainerManager : MonoBehaviour
 
     static readonly Vector2Int[] NeighborOffsets = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
+    //adjacent cells
     public List<Vector2Int> Neighbors(Vector2Int cell)
     {
         var neighbors = new List<Vector2Int>(NeighborOffsets.Length);
@@ -194,6 +189,7 @@ public class ContainerManager : MonoBehaviour
             return Random.Range(0, frontier.Count);
         }
 
+        //picks index of the cell best fit bias
         int bestIndex = 0;
         int bestScore = int.MinValue;
         for (int i = 0; i < frontier.Count; i++)
@@ -207,32 +203,5 @@ public class ContainerManager : MonoBehaviour
             }
         }
         return bestIndex;
-    }
-
-    void DrawContainers()
-    {
-        foreach (Container container in Containers)
-        {
-            var matrices = new List<Matrix4x4>(container.Cells.Count);
-            foreach (Vector2Int cell in container.Cells)
-            {
-                Vector3 center = Grid.Instance.CellToWorld(cell);
-                matrices.Add(Matrix4x4.TRS(center, Quaternion.identity, Vector3.one * Grid.Instance.CellSize));
-            }
-            Grid.DrawBatched(quadMesh, containerMaterials[container], matrices);
-        }
-    }
-
-    static Mesh BuildQuadMesh()
-    {
-        var vertices = new[]
-        {
-            new Vector3(-0.5f, -0.5f, 0f),
-            new Vector3(-0.5f, 0.5f, 0f),
-            new Vector3(0.5f, 0.5f, 0f),
-            new Vector3(0.5f, -0.5f, 0f),
-        };
-        var triangles = new[] { 0, 1, 2, 0, 2, 3 };
-        return Grid.BuildMesh("Quad", vertices, triangles);
     }
 }

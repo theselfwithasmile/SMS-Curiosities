@@ -37,7 +37,7 @@ public static class ConnectPathEffect
         renderer.startWidth = width;
         renderer.endWidth = width;
         renderer.numCapVertices = 4;
-        renderer.material = Grid.BuildMaterial(color);
+        renderer.material = GridRenderer.BuildMaterial(color);
         renderer.sortingOrder = 100;
 
         return line;

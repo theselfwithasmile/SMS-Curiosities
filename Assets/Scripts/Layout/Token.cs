@@ -1,13 +1,15 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.EventSystems;
+using UnityEngine.Playables;
 
 // Token absorbs what used to be a separate Draggable component - every token that exists is
 // draggable, and the only remaining per-variant differences (CellOffsets, EscapeLane) are plain
 // data rather than a pluggable strategy object, so there was never a real reason to keep the drag
 // verb as a component of its own.
 [RequireComponent(typeof(Collider2D))]
-public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
     public Container CurrentContainer;
     
@@ -46,6 +48,22 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     Coroutine activeMoveTween;
     Transform escapeArrow;
 
+    // The AnimationClips TokenSpawner assigns are ordinary (non-legacy) clips authored in the
+    // Animation window, not legacy clips - the old Animation component can't play those at all,
+    // so playback goes through the Playables API instead: an Animator purely as a bind target
+    // (no Controller needed) plus a single AnimationClipPlayable we drive by hand.
+    Animator animator;
+    PlayableGraph playableGraph;
+    AnimationClipPlayable clipPlayable;
+    AnimationClip currentClip;
+    bool isHovered;
+    bool isDragging;
+    bool isAnimating;
+
+    // True once an emoji AnimationClip has been assigned - lets callers (TokenSpawner's flat
+    // color tint) skip work that would otherwise fight the emoji art's own colors.
+    public bool HasAnimation => currentClip != null;
+
     static Mesh arrowMesh;
 
     void Awake()
@@ -55,11 +73,11 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     // Parking Jam: a small triangle child pointing along EscapeDirection, sitting at the body's
     // head cell (CellOffsets' last entry - ParkingJamBaseZone builds offsets in the same
-    // tail-to-head order as the car's body). Built procedurally, same as Grid/ContainerManager's
-    // own quads - there's no art asset for this yet, and one triangle doesn't need one.
+    // tail-to-head order as the car's body). Built procedurally, same as GridRenderer's own
+    // quads/dots - there's no art asset for this yet, and one triangle doesn't need one.
     public void ShowEscapeArrow()
     {
-        if (arrowMesh == null) arrowMesh = BuildArrowMesh();
+        if (arrowMesh == null) arrowMesh = GridRenderer.BuildArrowMesh();
 
         var arrowObject = new GameObject("EscapeArrow");
         arrowObject.transform.SetParent(transform, false);
@@ -73,23 +91,87 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         meshFilter.mesh = arrowMesh;
 
         var meshRenderer = arrowObject.AddComponent<MeshRenderer>();
-        meshRenderer.material = Grid.BuildMaterial(Color.white);
+        meshRenderer.material = GridRenderer.BuildMaterial(Color.white);
         meshRenderer.sortingOrder = GetComponent<SpriteRenderer>().sortingOrder + 1;
 
         escapeArrow = arrowObject.transform;
     }
 
-    static Mesh BuildArrowMesh()
+    // The graph is driven entirely by hand (never PlayableGraph.Play()) - deliberately, so this
+    // Evaluate call is the only thing advancing it and there's no risk of Unity's own per-frame
+    // auto-evaluation double-advancing time on top of it. Playables don't loop clips on their
+    // own either, so wrapping past clip length is manual too. Guarded by isAnimating so idle
+    // (the common case: not hovered, not dragged) tokens pay nothing here.
+    void Update()
     {
-        var vertices = new[]
+        if (!isAnimating || currentClip == null || currentClip.length <= 0f) return;
+
+        playableGraph.Evaluate(Time.deltaTime);
+        if (clipPlayable.GetTime() >= currentClip.length)
         {
-            new Vector3(-0.3f, -0.35f, 0f),
-            new Vector3(0.3f, -0.35f, 0f),
-            new Vector3(0f, 0.35f, 0f),
-        };
-        var triangles = new[] { 0, 1, 2 };
-        return Grid.BuildMesh("EscapeArrow", vertices, triangles);
+            clipPlayable.SetTime(clipPlayable.GetTime() % currentClip.length);
+        }
     }
+
+    void OnDestroy()
+    {
+        if (playableGraph.IsValid()) playableGraph.Destroy();
+    }
+
+    // Assigns the sprite flipbook for this token's current Group/Tier (TokenSpawner resolves
+    // which clip that is). Tokens sit on a static resting frame otherwise - the clip only plays
+    // while hovered or dragged, via OnPointerEnter/Exit and the drag handlers below.
+    public void SetAnimationClip(AnimationClip clip)
+    {
+        if (clip == null) return;
+
+        if (playableGraph.IsValid()) playableGraph.Destroy();
+        currentClip = clip;
+
+        // Prefer an Animator already on the prefab - one added here via AddComponent isn't
+        // reliably ready to accept a Playables binding in the same frame it's created, so the
+        // very first Evaluate (the one that shows the resting frame) can silently no-op.
+        if (animator == null) animator = GetComponent<Animator>();
+        if (animator == null) animator = gameObject.AddComponent<Animator>();
+        playableGraph = PlayableGraph.Create($"{name}Animation");
+        AnimationPlayableOutput output = AnimationPlayableOutput.Create(playableGraph, "Output", animator);
+        clipPlayable = AnimationClipPlayable.Create(playableGraph, clip);
+        output.SetSourcePlayable(clipPlayable);
+
+        // Emoji art carries its own color - stop tinting it with the group's flat placeholder.
+        GetComponent<SpriteRenderer>().color = Color.white;
+
+        StopAnimationAndReset();
+    }
+
+    void PlayAnimation()
+    {
+        if (currentClip == null || !playableGraph.IsValid()) return;
+        isAnimating = true;
+    }
+
+    // Stops and rewinds to frame 0 rather than just pausing, so "not hovered, not dragging"
+    // always reads as the same static resting pose regardless of where playback left off.
+    void StopAnimationAndReset()
+    {
+        if (currentClip == null || !playableGraph.IsValid()) return;
+        isAnimating = false;
+        clipPlayable.SetTime(0);
+        playableGraph.Evaluate(0);
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        isHovered = true;
+        PlayAnimation();
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        isHovered = false;
+        if (!isDragging) StopAnimationAndReset();
+    }
+    
 
     // Layering: a buried token starts hidden and non-interactive (SetRevealed(false) right after
     // spawn) until whatever's above it in the same cell clears, at which point Container.RevealNext
@@ -125,6 +207,8 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (!dragAllowed) return;
 
         TweenRunner.Instance.PickupPop(transform);
+        isDragging = true;
+        PlayAnimation();
 
         Camera camera = EventCamera(eventData);
         zDistance = camera.WorldToScreenPoint(transform.position).z;
@@ -139,6 +223,9 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        isDragging = false;
+        if (!isHovered) StopAnimationAndReset();
+
         if (!dragAllowed || Grid.Instance == null) return;
 
         if (IsEscapePiece)
@@ -251,15 +338,13 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     // Block Puzzle-style placement: every offset cell (anchored at the drop cell) must belong to
     // at least one container, and all of them must have room, checked as one atomic footprint
-    // rather than cell by cell.
+    // rather than cell by cell. On success, TryClaimFootprint decomposes this piece into
+    // independent single-cell tokens (already positioned) and destroys this GameObject as part of
+    // that - nothing left to do here, and touching `this` afterward would be a destroyed reference.
     void TryPlaceFootprint()
     {
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);
-        if (TokenSpawner.Instance.TryClaimFootprint(this, anchor, CellOffsets))
-        {
-            MoveToSlot(Grid.Instance.CellToWorld(anchor));
-        }
-        else
+        if (!TokenSpawner.Instance.TryClaimFootprint(this, anchor, CellOffsets))
         {
             MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);

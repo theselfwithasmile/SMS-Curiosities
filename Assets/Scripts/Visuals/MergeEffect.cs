@@ -18,6 +18,7 @@ public static class MergeEffect
 
         Token merged = TokenSpawner.Instance.SpawnColoredToken(group, target);
         merged.Tier = nextTier;
+        TokenSpawner.Instance.ApplyAnimation(merged); // re-resolve now that Tier no longer matches the tier SpawnColoredToken applied at
         TweenRunner.Instance.PopIn(merged.transform);
         container.TryAccept(merged);
     }

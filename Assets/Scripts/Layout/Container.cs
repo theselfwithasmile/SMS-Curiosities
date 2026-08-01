@@ -21,20 +21,13 @@ public interface IResolution
     void Resolve(Container container);
 }
 
-// What happens when a token is dropped onto a cell that's already occupied (e.g. Merge's
-// combine, Toon Blast's swap) - distinct from IEntryConstraint, which only gates empty slots.
+//what happens when a token is dropped onto a cell that's already occupied
 public interface IOccupantInteraction
 {
-    // incomingOrigin is where the dragged token was removed from at drag-start (already vacated
-    // by the time this runs) - null if it wasn't in a container. Needed for swaps, which put the
-    // occupant there; ignored by non-swap interactions like Merge.
+    // incomingOrigin is where the dragged token was removed from at drag-start
     bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container);
 }
 
-// Bundles the four pluggable rule slots so a zone can wire them onto many containers in one call
-// instead of four separate property assignments per container. Rule instances here are almost
-// always stateless (or share the same constructor args) across every container in a zone, so one
-// ContainerRuleSet is normally shared, not rebuilt per container.
 public class ContainerRuleSet
 {
     public IEntryConstraint EntryConstraint;
@@ -59,24 +52,18 @@ public class ContainerRuleSet
 }
 
 public class Container
-{
-    // Claim order, not just membership, letting tokens stack into the next open slot
-    // instead of whichever cell was literally dropped on (which could overlap another member).
+{ 
     public readonly List<Vector2Int> OrderedCells;
     public readonly HashSet<Vector2Int> Cells;
     public readonly Color Color;
     public readonly List<Token> Members = new List<Token>();
+    public readonly Queue<Token> BuriedTokens = new Queue<Token>();
 
     public readonly List<IEntryConstraint> EntryConstraints = new List<IEntryConstraint>();
     public readonly List<IExitConstraint> ExitConstraints = new List<IExitConstraint>();
     public ICompletionPredicate CompletionPredicate;
     public IResolution Resolution;
     public IOccupantInteraction OccupantInteraction;
-
-    // Layering: tokens waiting underneath the current occupant(s), hidden and non-interactive
-    // until revealed. Empty for every non-layered container (the ordinary case) - RevealNext is a
-    // no-op whenever this is empty, so layering costs nothing for zones that don't use it.
-    public readonly Queue<Token> BuriedTokens = new Queue<Token>();
 
     public int Capacity => OrderedCells.Count;
 
@@ -86,8 +73,7 @@ public class Container
         Cells = new HashSet<Vector2Int>(orderedCells);
         Color = color;
     }
-
-
+    
     public Vector2Int NextAvailableCell() => OrderedCells[Members.Count];
 
     public bool CanAccept(Token token)
@@ -101,12 +87,7 @@ public class Container
         return true;
     }
 
-    // Re-adds a token unconditionally, bypassing entry constraints entirely - used only to revert
-    // a token to wherever it just came from after a failed drag. Reverting should never be
-    // gate-kept by rules meant for genuinely new placements (NoEntryConstraint, for instance,
-    // would otherwise also block a token from returning to the exact container it left moments
-    // ago). Never trips completion either - the container's state is exactly what it was before
-    // the drag started, which by definition wasn't already complete.
+    //bypasses entry constraints
     public void ForceAccept(Token token)
     {
         Members.Add(token);
@@ -128,8 +109,7 @@ public class Container
         return true;
     }
 
-    // Only tried by Token when CanAccept fails due to capacity, not due to an entry
-    // constraint rejecting the token outright.
+    //only tried by Token when CanAccept fails due to capacity
     public bool TryInteractWithOccupant(Token incoming, Container incomingOrigin)
     {
         return OccupantInteraction != null && Members.Count == 1
@@ -144,11 +124,7 @@ public class Container
         }
         return true;
     }
-
-    // Deliberately does NOT reveal the next buried token - also used for temporary removals that
-    // immediately re-fill the same cell in the same operation (drag pickup that might revert
-    // right back, a swap's displaced occupant), where surfacing what's buried underneath would be
-    // premature and would collide with whatever's about to be placed back into this same slot.
+    
     public bool TryRemove(Token token)
     {
         if (!Members.Contains(token) || !CanRemove(token)) return false;
@@ -158,25 +134,31 @@ public class Container
         return true;
     }
 
-    // Permanently removes a token that's being taken out of play entirely (matched and destroyed,
-    // for instance) - as opposed to TryRemove, which doubles as a temporary detach for pickups
-    // that might come right back. Reveals whatever's buried underneath, if anything. Callers still
-    // own destroying the token's GameObject themselves.
+    //permanently removes singular token that's being taken out of play entirely
     public void Consume(Token token)
     {
         TryRemove(token);
+        CleanupOtherMemberships(token);
         RevealNext();
     }
 
-    // Clears every current member outright (a whole-container clear like Block Puzzle's full-row
-    // resolution, as opposed to Consume's single-token removal) and reveals whatever's buried
-    // underneath. Only for clears that don't immediately re-fill the same container afterward -
-    // Merge's combine deliberately does NOT use this, since it always refills the same cell right
-    // away and a reveal firing first would collide with that.
+    //clears every current member outright
     public void ClearMembers()
     {
+        var cleared = new List<Token>(Members);
         Members.Clear();
+        foreach (Token token in cleared) CleanupOtherMemberships(token);
         RevealNext();
+    }
+    
+    void CleanupOtherMemberships(Token token)
+    {
+        if (token == null) return;
+        Vector2Int cell = Grid.Instance.WorldToCell(token.transform.position);  
+        foreach (Container other in ContainerManager.Instance.GetContainersAt(cell))
+        {
+            if (other != this) other.Members.Remove(token);  //fine to call since actual destruction is deferred
+        }
     }
 
     // Promotes the next buried token into this cell once it has room - only relevant for layered
