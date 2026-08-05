@@ -19,7 +19,7 @@ public class MergeBaseZone : BaseZone
 
     protected override List<Container> GenerateContainers()
     {
-        List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, boardSize, boardSize), Color.gray);
+        List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, boardSize, boardSize), GameState.Instance.BubbleColor);
 
         // Reaching a tier requires 2^tier same-group tokens merged in sequence, so the target has
         // to fit within how many cells could ever hold that group's tokens at once - otherwise the

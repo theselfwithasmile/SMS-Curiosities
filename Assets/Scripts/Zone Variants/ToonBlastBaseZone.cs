@@ -19,7 +19,7 @@ public class ToonBlastBaseZone : BaseZone
 
     protected override List<Container> GenerateContainers()
     {
-        List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, boardSize, boardSize), Color.gray);
+        List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, boardSize, boardSize), GameState.Instance.BubbleColor);
         new ContainerRuleSet
         {
             OccupantInteraction = new SwapInteraction(bench, QuotaFactor),

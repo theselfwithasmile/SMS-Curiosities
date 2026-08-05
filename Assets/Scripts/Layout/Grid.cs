@@ -23,6 +23,18 @@ public class Grid : MonoBehaviour
     public int TotalRows => rows + benchRows;
     int benchRows;
 
+    // Puzzle board dimensions are driven by the active zone's own difficulty-scaled board size
+    // (SetBoardSize, called once early in BaseZone.Start()) - the inspector columns/rows above are
+    // only the pre-zone default a fresh scene load starts from. Square only (columns == rows),
+    // same as every layout that builds against boardSize already assumes.
+    public void SetBoardSize(int size)
+    {
+        if (columns == size && rows == size) return;
+        columns = size;
+        rows = size;
+        RecomputeLayout();
+    }
+
     readonly HashSet<Vector2Int> occupiedCells = new HashSet<Vector2Int>();
 
     Camera cam;

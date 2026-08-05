@@ -9,6 +9,7 @@ public class GameState: MonoBehaviour
     public Vector2 mousePos;
 
     [SerializeField] Color[] groupColors;
+    public Color BubbleColor = new Color(0f, 0.5f, 1f, 1f);
     static readonly List<Vector2Int>[] Shapes =
     {
         new List<Vector2Int> { Vector2Int.zero },
@@ -17,6 +18,8 @@ public class GameState: MonoBehaviour
         new List<Vector2Int> { Vector2Int.zero, Vector2Int.up, Vector2Int.right },
         new List<Vector2Int> { Vector2Int.zero, Vector2Int.right, Vector2Int.up, Vector2Int.up + Vector2Int.right },
     };
+
+    
     
     public int GroupCount => groupColors.Length;
     

@@ -43,28 +43,24 @@ public class OrthogonalLayout : IContainerLayout
     }
 }
 
-// A single container grown via randomized region growth (one of Water Sort's tubes/shelves).
-// axisBias (e.g. Vector2Int.up) with biasStrength > 0 skews growth along an axis - strong bias
-// produces tube/lane shapes, no bias produces blobs.
-//
-
+// A single rect-shaped container placed at a random free position (one of Water Sort's
+// tubes/shelves). axisBias (e.g. Vector2Int.up) produces a 1-wide line along that axis (capacity
+// cells long) - no bias produces the closest-to-square rect instead.
 public class RegionGrowthLayout : IContainerLayout
 {
     readonly int capacity;
     readonly Vector2Int axisBias;
-    readonly float biasStrength;
 
-    public RegionGrowthLayout(int capacity, Vector2Int axisBias = default, float biasStrength = 0f)
+    public RegionGrowthLayout(int capacity, Vector2Int axisBias = default)
     {
         this.capacity = capacity;
         this.axisBias = axisBias;
-        this.biasStrength = biasStrength;
     }
 
     //builds exactly one container per call rather than deriving
     public List<Container> Build(RectInt bounds, Color color)
     {
-        Container container = ContainerManager.Instance.GenerateContainer(capacity, color, axisBias, biasStrength);
+        Container container = ContainerManager.Instance.GenerateContainer(capacity, color, axisBias);
         return container != null ? new List<Container> { container } : new List<Container>();
     }
 }

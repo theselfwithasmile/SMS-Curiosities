@@ -187,11 +187,15 @@ public class TweenRunner : MonoBehaviour
 
     IEnumerator PopInRoutine(Transform target, float overshoot, float duration)
     {
+        // Overshoot/settle relative to the token's own current scale (not a hardcoded
+        // Vector3.one) - same reasoning as GrowIn/PickupPop - so a merge result whose prefab
+        // scale isn't 1 doesn't snap to the wrong size once it settles.
+        Vector3 baseScale = target.localScale;
         float growDuration = duration * 0.7f;
         float settleDuration = duration - growDuration;
 
-        yield return ScaleRoutine(target, Vector3.zero, Vector3.one * overshoot, growDuration, EaseOutCubic);
-        if (target != null) yield return ScaleRoutine(target, target.localScale, Vector3.one, settleDuration, EaseInCubic);
+        yield return ScaleRoutine(target, Vector3.zero, baseScale * overshoot, growDuration, EaseOutCubic);
+        if (target != null) yield return ScaleRoutine(target, target.localScale, baseScale, settleDuration, EaseInCubic);
     }
 
     static void DisableCollider(Token token)

@@ -10,8 +10,9 @@ namespace Variants
         [SerializeField] protected Color boardColor = Color.gray;
 
         // How much harder each accumulated difficulty level makes this zone - boardGrowthPerLevel
-        // widens the board (clamped by Grid's own inspector columns/rows, same as boardLength
-        // always was), spawnGrowthPerLevel is a general-purpose "one more level, one more X" knob
+        // widens the board (Grid itself grows to match via Grid.SetBoardSize, rather than
+        // boardSize being clamped down to whatever the scene's Grid inspector values happen to
+        // be), spawnGrowthPerLevel is a general-purpose "one more level, one more X" knob
         // individual zones opt into for their own extra counts (tube count, initial tokens, staged
         // piece batch size, clear quota...) via the shared Scaled() helper below.
         [SerializeField] protected int boardGrowthPerLevel = 1;
@@ -62,7 +63,8 @@ namespace Variants
         void Start()
         {
             grid = Grid.Instance;
-            boardSize = Mathf.Min(Scaled(boardLength, boardGrowthPerLevel), grid.Columns, grid.Rows);
+            boardSize = Scaled(boardLength, boardGrowthPerLevel);
+            grid.SetBoardSize(boardSize);
             groupCount = GameState.Instance.GroupCount;
 
             int benchRows = BenchCapacity > 0 ? Mathf.Max(1, Mathf.CeilToInt(BenchCapacity / (float)grid.Columns)) : 0;
@@ -73,7 +75,7 @@ namespace Variants
             }
             if (benchRows > 0)
             {
-                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, grid.BenchOrigin, grid.Columns, benchRows), Color.gray);
+                bench = ContainerManager.Instance.CreateFixedContainer(new RectInt(0, grid.BenchOrigin, grid.Columns, benchRows), GameState.Instance.BubbleColor);
             }
 
             containers = GenerateContainers();

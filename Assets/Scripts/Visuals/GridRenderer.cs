@@ -11,8 +11,6 @@ public class GridRenderer : MonoBehaviour
 
     const int MaxInstancesPerBatch = 1023;
 
-    private Mesh quadMesh;
-    
     Mesh dotMesh;
     Material dotMaterial;
 
@@ -21,7 +19,6 @@ public class GridRenderer : MonoBehaviour
         Instance = this;
         dotMesh = BuildDotMesh();
         dotMaterial = BuildMaterial(dotColor);
-        quadMesh = BuildQuadMesh();
     }
 
 
@@ -29,36 +26,8 @@ public class GridRenderer : MonoBehaviour
     void Update()
     {
         DrawEmptyCells();
-        DrawContainers();
-    }
-    
-    void DrawContainers()
-    {
-        foreach (Container container in ContainerManager.Instance.Containers)
-        {
-            var matrices = new List<Matrix4x4>(container.Cells.Count);
-            foreach (Vector2Int cell in container.Cells)
-            {
-                Vector3 center = Grid.Instance.CellToWorld(cell);
-                matrices.Add(Matrix4x4.TRS(center, Quaternion.identity, Vector3.one * Grid.Instance.CellSize));
-            }
-            DrawBatched(quadMesh, ContainerManager.Instance.GetMaterial(container), matrices);
-        }
     }
 
-    static Mesh BuildQuadMesh()
-    {
-        var vertices = new[]
-        {
-            new Vector3(-0.5f, -0.5f, 0f),
-            new Vector3(-0.5f, 0.5f, 0f),
-            new Vector3(0.5f, 0.5f, 0f),
-            new Vector3(0.5f, -0.5f, 0f),
-        };
-        var triangles = new[] { 0, 1, 2, 0, 2, 3 };
-        return BuildMesh("Quad", vertices, triangles);
-    }
-    
     void DrawEmptyCells()
     {
         int columns = Grid.Instance.Columns;

@@ -56,6 +56,11 @@ public class Container
     public readonly List<Vector2Int> OrderedCells;
     public readonly HashSet<Vector2Int> Cells;
     public readonly Color Color;
+    // Always the exact rect OrderedCells fills - containers are generated/placed as rects only,
+    // so this is what the container prefab's SpriteRenderer is sized/positioned from, rather than
+    // re-deriving bounds from OrderedCells (which, for a fixed container built over already-
+    // claimed cells, can end up smaller than the rect it was requested with).
+    public readonly RectInt Bounds;
     public readonly List<Token> Members = new List<Token>();
 
     // Which token (if any) currently occupies each of this container's cells - lets a container
@@ -87,11 +92,12 @@ public class Container
         }
     }
 
-    public Container(List<Vector2Int> orderedCells, Color color)
+    public Container(List<Vector2Int> orderedCells, Color color, RectInt bounds)
     {
         OrderedCells = orderedCells;
         Cells = new HashSet<Vector2Int>(orderedCells);
         Color = color;
+        Bounds = bounds;
     }
 
     // First cell (in layout order) not currently occupied - used by callers that don't care which

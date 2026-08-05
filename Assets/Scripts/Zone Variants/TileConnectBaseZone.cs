@@ -25,15 +25,8 @@ public class TileConnectBaseZone : BaseZone
     
     protected override List<Container> GenerateContainers()
     {
-        //leave the outermost grid layers to be empty to create room for dragging(?)
-        int fieldWidth = Mathf.Max(2, grid.Columns - margin * 2);
-        int fieldHeight = Mathf.Max(2, grid.Rows - margin * 2);
-        if ((fieldWidth * fieldHeight) % 2 != 0) fieldWidth -= 1; // needs an even cell count to pair fully
-
-        var bounds = new RectInt(margin, margin, fieldWidth, fieldHeight);
-
-        //per-cell layout
-        List<Container> cells = new PerTileLayout().Build(bounds, boardColor);
+        var fieldBounds = new RectInt(margin, margin, boardSize - margin * 2, boardSize - margin * 2);
+        List<Container> cells = new PerTileLayout().Build(fieldBounds, GameState.Instance.BubbleColor);
         new ContainerRuleSet { EntryConstraint = new NoEntryConstraint(), OccupantInteraction = new PathConnectInteraction() }.ApplyToAll(cells);
         cellLookup = new Dictionary<Vector2Int, Container>();
         foreach (Container cell in cells) cellLookup[cell.OrderedCells[0]] = cell; //maps each (per-grid) container to the grid coords

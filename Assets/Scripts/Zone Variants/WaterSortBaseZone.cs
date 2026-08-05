@@ -44,7 +44,7 @@ public class WaterSortBaseZone : BaseZone
 
     protected override List<Container> GenerateContainers()
     {
-        var tubeLayout = new RegionGrowthLayout(QuotaFactor, Vector2Int.up, 1f);
+        var tubeLayout = new RegionGrowthLayout(QuotaFactor, Vector2Int.up);
         var tubes = new List<Container>();
 
         // One coloured container per group — the colour hints at what the player should sort in.
@@ -57,7 +57,7 @@ public class WaterSortBaseZone : BaseZone
         // These are the "free slots" that make arbitrary rearrangement possible.
         for (int i = 0; i < emptyTubeCount; i++)
         {
-            tubes.AddRange(tubeLayout.Build(default, Color.gray));
+            tubes.AddRange(tubeLayout.Build(default, GameState.Instance.BubbleColor));
         }
 
         // GroupMatchConstraint still gates which colour may enter a given tube (or an empty one,
