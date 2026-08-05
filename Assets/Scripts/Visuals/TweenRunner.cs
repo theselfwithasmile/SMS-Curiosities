@@ -38,10 +38,12 @@ public class TweenRunner : MonoBehaviour
     }
 
     // Reveal-from-buried: grows in from nothing rather than just appearing, since the token was
-    // fully hidden (SetRevealed(false)) up to this point, not merely offscreen.
+    // fully hidden (SetRevealed(false)) up to this point, not merely offscreen. Grows to the
+    // target's own current scale (not a hardcoded Vector3.one) - same reasoning as PickupPop -
+    // so it still reads correctly on a prefab whose authored scale isn't 1.
     public void GrowIn(Transform target, float duration = 0.15f)
     {
-        StartCoroutine(ScaleRoutine(target, Vector3.zero, Vector3.one, duration, EaseOutCubic));
+        StartCoroutine(ScaleRoutine(target, Vector3.zero, target.localScale, duration, EaseOutCubic));
     }
 
     public void ShrinkAndDestroy(Token token, float duration = 0.15f)
@@ -52,10 +54,16 @@ public class TweenRunner : MonoBehaviour
     // Starts each token's shrink a beat apart instead of all at once, so a container clearing
     // several members at once reads as a small cascade rather than a single flash. Copies
     // `tokens` synchronously (before the first yield) since callers typically pass
-    // Container.Members and clear it themselves right after calling this.
+    // Container.Members and clear it themselves right after calling this. Colliders are disabled
+    // for every token right here, up front - these tokens are already logically Consume()'d
+    // (CurrentContainer null) by the time this is called, so leaving later-staggered ones
+    // clickable would let a fast drag grab an already-cleared "zombie" token before its own turn
+    // in the stagger loop reaches it.
     public void ShrinkAndDestroySequential(IEnumerable<Token> tokens, float stagger = 0.05f, float duration = 0.15f)
     {
-        StartCoroutine(ShrinkAndDestroySequentialRoutine(new List<Token>(tokens), stagger, duration));
+        var list = new List<Token>(tokens);
+        foreach (Token token in list) DisableCollider(token);
+        StartCoroutine(ShrinkAndDestroySequentialRoutine(list, stagger, duration));
     }
 
     // Parking Jam's escape arrow: briefly pulses the arrow child, then shrinks the whole token

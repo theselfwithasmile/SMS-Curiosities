@@ -45,6 +45,13 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // anything about zones or win conditions itself.
     public System.Action OnEscaped;
 
+    // Generic (lane-free) counterpart to IsEscapePiece: true once a zone considers this token
+    // "finished" (e.g. Merge's target-tier result) - dropping it anywhere off the board (outside
+    // every container, not just a specific baked corridor) destroys it instead of reverting. Lets
+    // a zone's win condition just be "every container empty" (BaseZone's generic default) rather
+    // than needing its own bespoke completion check.
+    public bool CanExitBoard;
+
     Vector3 pointerOffset;
     Vector3 originalPosition;
     Container originalContainer;
@@ -85,12 +92,16 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (arrowMesh == null) arrowMesh = GridRenderer.BuildArrowMesh();
 
         var arrowObject = new GameObject("EscapeArrow");
-        arrowObject.transform.SetParent(transform, false);
 
+        // World-space position/rotation/scale first, then reparent with worldPositionStays -
+        // same trick TokenSpawner uses for the extra cell sprites. The token root's own prefab
+        // scale isn't 1 (see Token.prefab), so setting localPosition/localScale directly under
+        // it (as this used to) put the arrow 3x too far from the head cell and 3x oversized.
         Vector2Int headOffset = CellOffsets[CellOffsets.Count - 1];
-        arrowObject.transform.localPosition = (Vector3)((Vector2)headOffset * Grid.Instance.CellSize);
-        arrowObject.transform.localRotation = Quaternion.FromToRotation(Vector3.up, new Vector3(EscapeDirection.x, EscapeDirection.y, 0f));
+        arrowObject.transform.position = transform.position + (Vector3)((Vector2)headOffset * Grid.Instance.CellSize);
+        arrowObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, new Vector3(EscapeDirection.x, EscapeDirection.y, 0f));
         arrowObject.transform.localScale = Vector3.one * (Grid.Instance.CellSize * 0.5f);
+        arrowObject.transform.SetParent(transform, true);
 
         var meshFilter = arrowObject.AddComponent<MeshFilter>();
         meshFilter.mesh = arrowMesh;
@@ -178,12 +189,51 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     }
     
 
-    // Layering: a buried token starts hidden and non-interactive (SetRevealed(false) right after
-    // spawn) until whatever's above it in the same cell clears, at which point Container.RevealNext
-    // calls this again with true.
+    // How much a buried token's color is darkened by, relative to its normal (revealed) color -
+    // a visible-but-dim cue that something is stacked underneath, rather than hiding it outright.
+    const float BuriedColorFactor = 0.45f;
+
+    // Buried tokens spawn dead-center under their occupant (same cell, same anchor position), so
+    // without an offset they'd sit perfectly behind an identically-sized sprite and the dimming
+    // above would never actually be visible. Nudging toward one corner by a fraction of a cell
+    // lets that corner peek out from behind the occupant instead.
+    const float BuriedPeekFraction = 0.22f;
+    static readonly Vector2 BuriedPeekDirection = new Vector2(1f, -1f).normalized;
+
+    Color revealedColor;
+    int revealedSortingOrder;
+    bool isBuried;
+
+    // Layering: a buried token starts dimmed, peeking from one corner, and non-interactive
+    // (SetRevealed(false) right after spawn, once its real color/sortingOrder are already
+    // assigned) until whatever's above it in the same cell is vacated, at which point
+    // Container.RevealAt calls this again with true to restore it - the SpriteRenderer itself
+    // stays enabled either way, since staying visible (if dim) is the whole point.
     public void SetRevealed(bool revealed)
     {
-        GetComponent<SpriteRenderer>().enabled = revealed;
+        if (revealed != isBuried) return; // already in the requested state - avoid re-applying the offset
+
+        SpriteRenderer renderer = GetComponent<SpriteRenderer>();
+        if (revealed)
+        {
+            renderer.color = revealedColor;
+            renderer.sortingOrder = revealedSortingOrder;
+            transform.position -= (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+            isBuried = false;
+        }
+        else
+        {
+            revealedColor = renderer.color;
+            revealedSortingOrder = renderer.sortingOrder;
+            renderer.color = new Color(
+                revealedColor.r * BuriedColorFactor,
+                revealedColor.g * BuriedColorFactor,
+                revealedColor.b * BuriedColorFactor,
+                revealedColor.a);
+            renderer.sortingOrder = revealedSortingOrder - 1; // always draws behind its occupant
+            transform.position += (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+            isBuried = true;
+        }
         GetComponent<Collider2D>().enabled = revealed;
     }
 
@@ -268,15 +318,35 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             return;
         }
 
-        if (candidates.Count > 0 && TryEnterAll(candidates, out Vector2Int targetCell))
+        // Dropped outside every container (off the board entirely) and this token is flagged as
+        // done - self-destruct instead of falling through to the revert branch below.
+        if (candidates.Count == 0 && CanExitBoard)
         {
-            MoveToSlot(Grid.Instance.CellToWorld(targetCell));
+            NotifyOriginVacated();
+            OnEscaped?.Invoke();
+            TweenRunner.Instance.ShrinkAndDestroy(this);
+            return;
+        }
+
+        if (candidates.Count > 0 && TryEnterAll(candidates, cell))
+        {
+            MoveToSlot(Grid.Instance.CellToWorld(cell));
+            NotifyOriginVacated();
         }
         else
         {
             MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);
         }
+    }
+
+    // Confirms the origin slot is permanently vacated (as opposed to the drag reverting back into
+    // it) - only now is it safe to reveal whatever was buried underneath, since a revert would
+    // otherwise collide the returning token with a freshly revealed one in the same cell.
+    void NotifyOriginVacated()
+    {
+        if (originalContainer == null) return;
+        originalContainer.RevealAt(Grid.Instance.WorldToCell(originalPosition));
     }
 
     // The body never partially moves - it either escapes whole or reverts whole. Since the lane is
@@ -334,20 +404,19 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
     }
 
-    // Snaps into the container's next open slot (claim order) rather than the exact cell
-    // dropped on, so two tokens accepted into the same multi-cell container never overlap.
-    bool TryEnterAll(IReadOnlyList<Container> containers, out Vector2Int targetCell)
+    // Places the token into the exact cell dropped on, across every container that owns that
+    // cell (a shared cell like Block Puzzle's row/column pair) - arbitrary-slot placement rather
+    // than always compacting into a multi-cell container's next open slot in claim order.
+    bool TryEnterAll(IReadOnlyList<Container> containers, Vector2Int dropCell)
     {
-        targetCell = default;
         for (int i = 0; i < containers.Count; i++)
         {
-            if (!containers[i].CanAccept(this)) return false;
+            if (!containers[i].CanAcceptAt(this, dropCell)) return false;
         }
 
-        targetCell = containers[0].NextAvailableCell();
         for (int i = 0; i < containers.Count; i++)
         {
-            containers[i].TryAccept(this);
+            containers[i].TryAcceptAt(this, dropCell);
         }
         return true;
     }

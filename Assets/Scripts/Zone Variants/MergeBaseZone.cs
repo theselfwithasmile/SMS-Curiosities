@@ -4,8 +4,12 @@ using Variants;
 
 // Merge (2048-direct): single-cell containers, no entry constraint (empty cells accept anything).
 // Dragging a token onto a same-group/same-tier occupant combines them via MergeInteraction
-// instead of being rejected. Win condition is "some cell's occupant reached targetTier" rather
-// than "everything cleared", since merging can never empty the board on its own.
+// instead of being rejected. Every group's token count is quota-matched to a multiple of
+// 2^targetTier (BuildQuotaMatchedGroups, same helper Toon Blast/Water Sort use for their own
+// solvability guarantee) so every group can in principle be merged all the way up. A token that
+// reaches the target tier is flagged CanExitBoard and can be dragged off the grid to destroy
+// itself (Token.OnEndDrag), so the board can actually go to zero occupants - letting this zone
+// fall back to BaseZone's plain "every container empty" win condition instead of a bespoke one.
 public class MergeBaseZone : BaseZone
 {
     [SerializeField] int initialTokenCount = 6;
@@ -22,50 +26,31 @@ public class MergeBaseZone : BaseZone
         // win condition is silently unreachable (tier 4 needs 16 tokens, easily more than a small
         // board can even hold simultaneously).
         int maxAchievableTier = Mathf.Max(1, Mathf.FloorToInt(Mathf.Log(Mathf.Max(1, cells.Count), 2f)));
-        effectiveTargetTier = Mathf.Clamp(targetTier, 1, maxAchievableTier);
+        effectiveTargetTier = Mathf.Clamp(Scaled(targetTier, spawnGrowthPerLevel), 1, maxAchievableTier);
 
         new ContainerRuleSet
         {
-            OccupantInteraction = new MergeInteraction(),
-            CompletionPredicate = new TierReachedPredicate(effectiveTargetTier),
-            Resolution = new LogResolution(),
+            OccupantInteraction = new MergeInteraction(effectiveTargetTier),
         }.ApplyToAll(cells);
         ContainerManager.Shuffle(cells);
 
         return cells;
     }
 
-    // Board-cleared (BaseZone's default) can never happen here - merging only ever consolidates
-    // tokens onto fewer cells, never empties the board outright - so this reports the win the
-    // moment any cell's occupant reaches the target tier instead.
-    protected override bool CheckWinCondition()
-    {
-        foreach (Container cell in containers)
-        {
-            if (cell.Members.Count > 0 && cell.Members[0].Tier >= effectiveTargetTier) return true;
-        }
-        return false;
-    }
-
-    // initialTokenCount and targetTier used to be independent, so the win condition was often
-    // mathematically unreachable (tier 4 needs 16 same-group tokens merged together, but 6 tokens
-    // spread randomly across several groups essentially never share that many). One randomly
-    // chosen "winning" group is now guaranteed at least 2^effectiveTargetTier tokens;
-    // initialTokenCount only controls how many additional distractor tokens (other groups) pad out
-    // the rest, and clamps up if it was set below what the target actually requires.
+    // Packs (most of) the board with tokens whose per-group totals are each a multiple of
+    // 2^effectiveTargetTier - the same quota-matching approach Toon Blast/Water Sort rely on, just
+    // with the merge chunk size instead of minMatchSize. A leftover smaller than the chunk size
+    // can still land as a straggler (same accepted imperfection BuildQuotaMatchedGroups already
+    // has for those zones) - a token stuck in a group too small to ever reach the target tier.
     protected override void GenerateTokens()
     {
         int requiredForWin = 1 << effectiveTargetTier;
-        int scaledInitial = Scaled(initialTokenCount, spawnGrowthPerLevel);
-        int spawnCount = Mathf.Min(Mathf.Max(scaledInitial, requiredForWin), containers.Count);
+        int totalTokens = Mathf.Clamp(Scaled(initialTokenCount, spawnGrowthPerLevel), requiredForWin, containers.Count);
 
-        int winningGroup = Random.Range(0, groupCount);
-        var tokenGroups = new List<int>(spawnCount);
-        for (int i = 0; i < requiredForWin; i++) tokenGroups.Add(winningGroup);
-        for (int i = tokenGroups.Count; i < spawnCount; i++) tokenGroups.Add(Random.Range(0, groupCount));
+        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(totalTokens, groupCount, requiredForWin);
         ContainerManager.Shuffle(tokenGroups);
 
-        for (int i = 0; i < spawnCount; i++)
+        for (int i = 0; i < tokenGroups.Count; i++)
         {
             Container cell = containers[i];
             Token token = TokenSpawner.Instance.SpawnColoredToken(tokenGroups[i], grid.CellToWorld(cell.OrderedCells[0]));

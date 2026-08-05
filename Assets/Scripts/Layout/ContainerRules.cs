@@ -19,9 +19,12 @@ public class FullPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count >= container.Capacity;
 }
 
-// Completes only when the container is full AND every member shares the same group.
-// Used by shelf-sort style zones where tokens can be placed freely (no GroupMatchConstraint),
-// so a full-but-mixed container should not trigger resolution.
+// Completes only when the container is full AND every member shares the same group. Needed
+// wherever a container can end up full-but-mixed without going through the normal entry-gated
+// path - e.g. Water Sort's buried-token reveal deliberately bypasses GroupMatchConstraint (a
+// buried token isn't a new player move, so nothing there guarantees it matches its tube), so
+// plain FullPredicate can't tell a genuinely solved tube apart from one that just happens to be
+// full.
 public class FullAndSameGroupPredicate : ICompletionPredicate
 {
     public bool IsComplete(Container container)
@@ -39,18 +42,6 @@ public class FullAndSameGroupPredicate : ICompletionPredicate
 public class EmptyPredicate : ICompletionPredicate
 {
     public bool IsComplete(Container container) => container.Members.Count == 0;
-}
-
-public class TierReachedPredicate : ICompletionPredicate
-{
-    readonly int targetTier;
-
-    public TierReachedPredicate(int targetTier)
-    {
-        this.targetTier = targetTier;
-    }
-
-    public bool IsComplete(Container container) => container.Members.Count > 0 && container.Members[0].Tier >= targetTier;
 }
 
 public class ClearResolution : IResolution
@@ -97,6 +88,18 @@ public class SpawnTokenResolution : IResolution
 
 public class MergeInteraction : IOccupantInteraction
 {
+    // The tier at which a merge result becomes the zone's final tile - passed through to
+    // MergeEffect so it can flag the spawned token as exitable (Token.CanExitBoard), rather than
+    // this zone needing its own per-cell completion predicate/resolution to notice a tier was
+    // reached (MergeBaseZone's win check is now the same generic "board fully cleared" every
+    // other zone uses, satisfied once every final tile has been dragged off).
+    readonly int targetTier;
+
+    public MergeInteraction(int targetTier)
+    {
+        this.targetTier = targetTier;
+    }
+
     public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
     {
         if (incoming.Group != occupant.Group || incoming.Tier != occupant.Tier) return false;
@@ -104,9 +107,9 @@ public class MergeInteraction : IOccupantInteraction
         Vector2Int cell = container.OrderedCells[0];
         int group = incoming.Group;
         int nextTier = incoming.Tier + 1;
-        
-        container.Members.Clear();
-        MergeEffect.Play(incoming, occupant, container, cell, group, nextTier);
+
+        container.ClearMembers();
+        MergeEffect.Play(incoming, occupant, container, cell, group, nextTier, nextTier >= targetTier);
         return true;
     }
 }
@@ -114,6 +117,8 @@ public class MergeInteraction : IOccupantInteraction
 //dropping onto a different-group occupant swaps the two
 // tokens instead of being rejected, then flood-fills same-group neighbors from both affected
 // cells and clears any run of minMatchSize+ into one grouped output token.
+// Matching is checked once, after the swap lands, against the drop cell's real grid neighbors -
+// not previewed mid-drag - so the swap has to land grid-adjacent to a cluster to connect it.
 public class SwapInteraction : IOccupantInteraction
 {
     readonly Container outputDestination;
@@ -280,13 +285,3 @@ public class CompositeResolution : IResolution
     }
 }
 
-public class LogResolution : IResolution
-{
-    public void Resolve(Container container)
-    {
-        if (container.Members.Count > 0)
-        {
-            Debug.Log($"Reached tier {container.Members[0].Tier}!");
-        }
-    }
-}

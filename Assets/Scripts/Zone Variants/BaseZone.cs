@@ -130,7 +130,7 @@ namespace Variants
 
             foreach (Container container in containers)
             {
-                if (container.Members.Count > 0 || container.BuriedTokens.Count > 0) return false;
+                if (container.Members.Count > 0 || container.BuriedCount > 0) return false;
             }
             return true;
         }
