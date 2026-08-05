@@ -15,6 +15,13 @@ public class Grid : MonoBehaviour
     public int Rows => rows;
     public float CellSize => cellSize;
 
+    // The board size Token.prefab's baked scale (3,3,1) was tuned to fill one cell of - the
+    // inspector's own pre-zone default (see the columns/rows fields above). TokenSpawner divides
+    // CellSize by this to rescale tokens for whatever board size a zone actually picked, so a
+    // denser board (more, smaller cells) doesn't leave tokens overflowing their container.
+    const int ReferenceBoardSize = 6;
+    public float ReferenceCellSize => ComputeCellSize(ReferenceBoardSize, ReferenceBoardSize);
+
     // Rows appended past the puzzle rows for a zone's bench/staging area - claimed dynamically
     // via ReserveBenchRows by whichever zone actually needs one, rather than manually budgeted
     // into `rows` per scene (that's what silently overflowed before: a bench trying to fit inside
@@ -71,16 +78,21 @@ public class Grid : MonoBehaviour
     // whole grid keeps fitting the screen across aspect ratios/orientations, with square cells.
     void RecomputeLayout()
     {
+        cellSize = ComputeCellSize(columns, TotalRows);
+
+        Vector2 gridSize = new Vector2(cellSize * columns, cellSize * TotalRows);
+        Vector2 center = (Vector2)cam.transform.position + (Vector2)transform.position;
+        origin = center - gridSize * 0.5f;
+    }
+
+    float ComputeCellSize(int cols, int totalRows)
+    {
         float viewportHeight = cam.orthographicSize * 2f;
         float viewportWidth = viewportHeight * cam.aspect;
         float usableWidth = viewportWidth * (1f - viewportPadding * 2f);
         float usableHeight = viewportHeight * (1f - viewportPadding * 2f);
 
-        cellSize = Mathf.Min(usableWidth / columns, usableHeight / TotalRows);
-
-        Vector2 gridSize = new Vector2(cellSize * columns, cellSize * TotalRows);
-        Vector2 center = (Vector2)cam.transform.position + (Vector2)transform.position;
-        origin = center - gridSize * 0.5f;
+        return Mathf.Min(usableWidth / cols, usableHeight / totalRows);
     }
 
     public Vector2Int WorldToCell(Vector3 worldPosition)
@@ -89,6 +101,19 @@ public class Grid : MonoBehaviour
         int cellX = Mathf.Clamp(Mathf.FloorToInt(local.x / cellSize), 0, columns - 1);
         int cellY = Mathf.Clamp(Mathf.FloorToInt(local.y / cellSize), 0, TotalRows - 1);
         return new Vector2Int(cellX, cellY);
+    }
+
+    // Unlike WorldToCell (clamped, so every drop resolves to *some* valid edge cell - the right
+    // behaviour for ordinary placement), this tells a caller whether a world position is actually
+    // within the grid+bench footprint at all. Needed for Token's CanExitBoard drag-off-board check
+    // - without it, dragging a token arbitrarily far past the board's edge still clamps to a real,
+    // in-bounds cell and never reads as "off the board".
+    public bool IsWorldPositionOnBoard(Vector3 worldPosition)
+    {
+        Vector2 local = (Vector2)worldPosition - origin;
+        int cellX = Mathf.FloorToInt(local.x / cellSize);
+        int cellY = Mathf.FloorToInt(local.y / cellSize);
+        return cellX >= 0 && cellX < columns && cellY >= 0 && cellY < TotalRows;
     }
 
     public Vector3 CellToWorld(Vector2Int cell)

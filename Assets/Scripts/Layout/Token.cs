@@ -283,6 +283,20 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             return;
         }
 
+        // Actually off the grid+bench footprint (not just the clamped edge cell WorldToCell would
+        // otherwise report) and this token is flagged as done - self-destruct instead of falling
+        // through to the revert branch below. Checked against the raw drop position rather than
+        // candidates.Count == 0, since WorldToCell clamps every drop onto a real in-bounds cell -
+        // dragging arbitrarily far past the board's edge would otherwise still resolve to an
+        // occupied/unoccupied edge container and never read as "outside everything".
+        if (CanExitBoard && !Grid.Instance.IsWorldPositionOnBoard(transform.position))
+        {
+            NotifyOriginVacated();
+            OnEscaped?.Invoke();
+            TweenRunner.Instance.ShrinkAndDestroy(this);
+            return;
+        }
+
         Vector2Int cell = Grid.Instance.WorldToCell(transform.position);
         IReadOnlyList<Container> candidates = ContainerManager.Instance.GetContainersAt(cell);
 
@@ -291,16 +305,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         // interaction itself (which may destroy/reposition tokens on its own), so just return.
         if (candidates.Count == 1 && !candidates[0].CanAccept(this) && candidates[0].TryInteractWithOccupant(this, originalContainer))
         {
-            return;
-        }
-
-        // Dropped outside every container (off the board entirely) and this token is flagged as
-        // done - self-destruct instead of falling through to the revert branch below.
-        if (candidates.Count == 0 && CanExitBoard)
-        {
-            NotifyOriginVacated();
-            OnEscaped?.Invoke();
-            TweenRunner.Instance.ShrinkAndDestroy(this);
             return;
         }
 

@@ -17,15 +17,23 @@ public class MergeBaseZone : BaseZone
 
     int effectiveTargetTier;
 
+    // How many distinct groups actually get a chunk on this board - decided in GenerateContainers
+    // (see comment there) and reused by GenerateTokens as the group count to quota-match against.
+    int playGroups;
+
     protected override List<Container> GenerateContainers()
     {
         List<Container> cells = new PerTileLayout().Build(new RectInt(0, 0, boardSize, boardSize), GameState.Instance.BubbleColor);
 
-        // Reaching a tier requires 2^tier same-group tokens merged in sequence, so the target has
-        // to fit within how many cells could ever hold that group's tokens at once - otherwise the
-        // win condition is silently unreachable (tier 4 needs 16 tokens, easily more than a small
-        // board can even hold simultaneously).
-        int maxAchievableTier = Mathf.Max(1, Mathf.FloorToInt(Mathf.Log(Mathf.Max(1, cells.Count), 2f)));
+        // Reaching a tier requires 2^tier same-group tokens merged in sequence. Sizing that
+        // against the WHOLE board (as if only one group would ever be in play) left
+        // BuildQuotaMatchedGroups below with no room for a second group's full chunk once
+        // totalTokens landed at exactly one chunk's worth - it silently dumped the entire quota
+        // into a single random group instead of spreading across groupCount. playGroups is how
+        // many distinct groups actually get a chunk this board; each needs its own equal share of
+        // the cells, so the target tier has to fit an EQUAL SHARE, not the entire board.
+        playGroups = Mathf.Clamp(groupCount, 1, Mathf.Max(1, cells.Count / 2));
+        int maxAchievableTier = Mathf.Max(1, Mathf.FloorToInt(Mathf.Log(Mathf.Max(2, cells.Count / playGroups), 2f)));
         effectiveTargetTier = Mathf.Clamp(Scaled(targetTier, spawnGrowthPerLevel), 1, maxAchievableTier);
 
         new ContainerRuleSet
@@ -37,17 +45,19 @@ public class MergeBaseZone : BaseZone
         return cells;
     }
 
-    // Packs (most of) the board with tokens whose per-group totals are each a multiple of
+    // Packs (most of) the board so every one of the playGroups groups gets its own multiple of
     // 2^effectiveTargetTier - the same quota-matching approach Toon Blast/Water Sort rely on, just
-    // with the merge chunk size instead of minMatchSize. A leftover smaller than the chunk size
-    // can still land as a straggler (same accepted imperfection BuildQuotaMatchedGroups already
-    // has for those zones) - a token stuck in a group too small to ever reach the target tier.
+    // scoped to playGroups (not every group in the palette) and with the merge chunk size instead
+    // of minMatchSize. A leftover smaller than the chunk size can still land as a straggler (same
+    // accepted imperfection BuildQuotaMatchedGroups already has for those zones) - a token stuck
+    // in a group too small to ever reach the target tier.
     protected override void GenerateTokens()
     {
         int requiredForWin = 1 << effectiveTargetTier;
-        int totalTokens = Mathf.Clamp(Scaled(initialTokenCount, spawnGrowthPerLevel), requiredForWin, containers.Count);
+        int minTokens = playGroups * requiredForWin;
+        int totalTokens = Mathf.Clamp(Scaled(initialTokenCount, spawnGrowthPerLevel), minTokens, containers.Count);
 
-        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(totalTokens, groupCount, requiredForWin);
+        List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(totalTokens, playGroups, requiredForWin);
         ContainerManager.Shuffle(tokenGroups);
 
         for (int i = 0; i < tokenGroups.Count; i++)

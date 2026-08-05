@@ -8,6 +8,8 @@ public class GameState: MonoBehaviour
     public static GameState Instance;
     
     public Vector2 mousePos;
+    [SerializeField] private TextMeshProUGUI guideText;
+    [SerializeField] private string[] guideSpec;
     [SerializeField] private TextMeshProUGUI scoreText;
     [HideInInspector] public int CurrScore=0; 
     
@@ -41,17 +43,21 @@ public class GameState: MonoBehaviour
     void Update()
     {
         mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
-        // scoreText lives in the scene, not on this persistent object, so a scene reload
-        // (see GameFlowManager.Reload) destroys the old one and leaves this reference stale.
-        // Re-find it lazily instead of relying on a one-time Inspector wire.
-        if (scoreText == null)
-        {
-            var scoreObj = GameObject.Find("Score");
-            if (scoreObj != null) scoreText = scoreObj.GetComponent<TextMeshProUGUI>();
-        }
-
+        
+        GetValidComponent(ref scoreText, "Score");
         if (scoreText != null) scoreText.text = CurrScore.ToString();
+
+        GetValidComponent(ref guideText, "Guide");
+        if (guideText != null) guideText.text = guideSpec[GameFlowManager.Instance.CurrentZoneIndex];
+    }
+
+    void GetValidComponent(ref TextMeshProUGUI text, string name)
+    {
+        if (text == null)
+        {
+            var obj = GameObject.Find(name);
+            if (obj != null) text = obj.GetComponent<TextMeshProUGUI>();
+        }
     }
     
     public Color GroupColor(int group)

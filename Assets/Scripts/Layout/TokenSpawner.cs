@@ -25,8 +25,17 @@ public class TokenSpawner : MonoBehaviour
     {
         Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, transform);
         token.Group = group;
+        ScaleToCell(token.transform);
         ApplyAnimation(token, byTier);
         return token;
+    }
+
+    // The prefab's baked scale is authored to fill one cell at Grid.ReferenceCellSize - rescale
+    // by how today's actual CellSize compares to that reference so a denser board (smaller cells)
+    // doesn't leave the token's emoji overflowing its container.
+    static void ScaleToCell(Transform tokenTransform)
+    {
+        tokenTransform.localScale *= Grid.Instance.CellSize / Grid.Instance.ReferenceCellSize;
     }
 
     // Every zone spawns a token and immediately applies its group color the same way - this was
@@ -98,6 +107,13 @@ public class TokenSpawner : MonoBehaviour
             var child = new GameObject($"Cell{i}");
             child.transform.position = anchorWorldPosition + (Vector3)((Vector2)offsets[i] * Grid.Instance.CellSize);
             child.transform.SetParent(token.transform, true);
+
+            // worldPositionStays above preserves this object's pre-parent world SCALE too (its
+            // freshly-created default of 1,1,1) - a third the root's actual on-screen size, since
+            // the Token prefab's root carries localScale 3,3,1 to blow its small native sprite up
+            // to cell size (see ContainerManager.CreateVisual for the same convention). Resetting
+            // to 1,1,1 here means "match the root", not "keep this object's old world scale".
+            child.transform.localScale = Vector3.one;
 
             var renderer = child.AddComponent<SpriteRenderer>();
             renderer.sprite = baseRenderer.sprite;
