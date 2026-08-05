@@ -66,14 +66,6 @@ public class TweenRunner : MonoBehaviour
         StartCoroutine(ShrinkAndDestroySequentialRoutine(list, stagger, duration));
     }
 
-    // Parking Jam's escape arrow: briefly pulses the arrow child, then shrinks the whole token
-    // (arrow included, since it's parented) and destroys it - the pulse is the "about to vanish"
-    // cue that plain ShrinkAndDestroy doesn't give.
-    public void PulseThenShrinkAndDestroy(Token token, Transform pulseTarget, float pulsePeak = 1.4f, float pulseDuration = 0.15f, float shrinkDuration = 0.15f)
-    {
-        StartCoroutine(PulseThenShrinkAndDestroyRoutine(token, pulseTarget, pulsePeak, pulseDuration, shrinkDuration));
-    }
-
     // Grow-in with a slight overshoot before settling - for a token that's the *result* of
     // something (a merge), as opposed to GrowIn's plain 0-to-1 used for a buried reveal.
     public void PopIn(Transform target, float overshoot = 1.15f, float duration = 0.18f)
@@ -173,16 +165,6 @@ public class TweenRunner : MonoBehaviour
             if (token != null) StartCoroutine(ShrinkAndDestroyRoutine(token, duration));
             yield return new WaitForSeconds(stagger);
         }
-    }
-
-    IEnumerator PulseThenShrinkAndDestroyRoutine(Token token, Transform pulseTarget, float pulsePeak, float pulseDuration, float shrinkDuration)
-    {
-        if (token == null) yield break;
-        DisableCollider(token);
-
-        yield return PopRoutine(pulseTarget, pulsePeak, pulseDuration);
-        if (token != null) yield return ScaleRoutine(token.transform, token.transform.localScale, Vector3.zero, shrinkDuration, EaseInCubic);
-        if (token != null) Destroy(token.gameObject);
     }
 
     IEnumerator PopInRoutine(Transform target, float overshoot, float duration)

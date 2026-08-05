@@ -16,10 +16,10 @@ public static class MergeEffect
         Vector3 target = Grid.Instance.CellToWorld(cell);
         yield return TweenRunner.Instance.ConvergeAndShrink(incoming, occupant, target);
 
-        Token merged = TokenSpawner.Instance.SpawnColoredToken(group, target);
+        Token merged = TokenSpawner.Instance.SpawnColoredToken(group, target, byTier: true);
         merged.Tier = nextTier;
         merged.CanExitBoard = isFinalTier;
-        TokenSpawner.Instance.ApplyAnimation(merged); // re-resolve now that Tier no longer matches the tier SpawnColoredToken applied at
+        TokenSpawner.Instance.ApplyAnimation(merged, byTier: true); // re-resolve now that Tier no longer matches the tier SpawnColoredToken applied at
         TweenRunner.Instance.PopIn(merged.transform);
         container.TryAccept(merged);
     }

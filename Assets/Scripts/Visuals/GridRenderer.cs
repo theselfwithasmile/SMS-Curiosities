@@ -102,21 +102,6 @@ public class GridRenderer : MonoBehaviour
         return mesh;
     }
     
-    // Parking Jam's escape arrow is a plain triangle child on the Token itself (built via
-    // Token.ShowEscapeArrow) - this just owns the shared mesh-building concern, same as the
-    // dot/quad meshes above.
-    public static Mesh BuildArrowMesh()
-    {
-        var vertices = new[]
-        {
-            new Vector3(-0.3f, -0.35f, 0f),
-            new Vector3(0.3f, -0.35f, 0f),
-            new Vector3(0f, 0.35f, 0f),
-        };
-        var triangles = new[] { 0, 1, 2 };
-        return BuildMesh("EscapeArrow", vertices, triangles);
-    }
-
     public static Material BuildMaterial(Color color)
     {
         // URP's 2D Renderer only draws passes it recognizes (e.g. Sprites/Default's);

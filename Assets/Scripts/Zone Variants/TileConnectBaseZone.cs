@@ -18,7 +18,7 @@ using Variants;
 public class TileConnectBaseZone : BaseZone
 {
     [SerializeField] int margin = 1;
-    protected override int maxGenerationAttempts => 60;
+    protected override int maxGenerationAttempts => 300;
     
     Dictionary<Vector2Int, Container> cellLookup;
     List<(Vector2Int a, Vector2Int b, int group)> pendingPairs;
@@ -27,6 +27,18 @@ public class TileConnectBaseZone : BaseZone
     {
         var fieldBounds = new RectInt(margin, margin, boardSize - margin * 2, boardSize - margin * 2);
         List<Container> cells = new PerTileLayout().Build(fieldBounds, GameState.Instance.BubbleColor);
+
+        // A perfect pairing needs an even cell count - an odd boardSize (odd^2 = odd) can never be
+        // fully paired off, so IsSolvable() would fail every single attempt, every time. Dropping
+        // one cell up front keeps the count even and pairing achievable regardless of boardSize's
+        // parity.
+        if (cells.Count % 2 != 0)
+        {
+            Container extra = cells[cells.Count - 1];
+            cells.RemoveAt(cells.Count - 1);
+            ContainerManager.Instance.RemoveContainer(extra);
+        }
+
         new ContainerRuleSet { EntryConstraint = new NoEntryConstraint(), OccupantInteraction = new PathConnectInteraction() }.ApplyToAll(cells);
         cellLookup = new Dictionary<Vector2Int, Container>();
         foreach (Container cell in cells) cellLookup[cell.OrderedCells[0]] = cell; //maps each (per-grid) container to the grid coords

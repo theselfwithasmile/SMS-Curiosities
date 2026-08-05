@@ -65,16 +65,23 @@ public class ParkingJamBaseZone : BaseZone
 
         foreach (CarSpec car in pendingLayout)
         {
-            Vector2Int anchor = car.body[0];
+            // Anchored at the head (not the tail) - the root Token is what carries the direction
+            // sprite (ApplyDirectionAnimation below), so it has to actually sit at the head cell
+            // for that sprite to visually point at the exit. SpawnMultiCellToken treats offsets[0]
+            // as the root's own cell (no separate child spawned for it), so the head has to be
+            // first in the list - built by walking car.body head-to-tail, the reverse of its own
+            // tail-to-head order.
+            Vector2Int anchor = car.body[car.body.Count - 1];
             var offsets = new List<Vector2Int>(car.body.Count);
-            foreach (Vector2Int cell in car.body) offsets.Add(cell - anchor); //applies local offset
+            for (int i = car.body.Count - 1; i >= 0; i--) offsets.Add(car.body[i] - anchor);
 
             Token token = TokenSpawner.Instance.SpawnMultiCellToken(car.group, grid.CellToWorld(anchor), offsets);
             token.IsEscapePiece = true;
             token.EscapeLane = car.escapeLane;
             token.EscapeDirection = car.direction;
+            token.AnchorCell = anchor;
             token.OnEscaped += () => remainingCars--;
-            token.ShowEscapeArrow();
+            TokenSpawner.Instance.ApplyDirectionAnimation(token, car.direction);
 
             foreach (Vector2Int cell in car.body)
             {

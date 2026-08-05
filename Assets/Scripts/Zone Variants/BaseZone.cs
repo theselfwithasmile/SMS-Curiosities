@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Variants
@@ -119,6 +120,11 @@ namespace Variants
                 zoneEnded = true;
                 GameFlowManager.Instance?.ReportLose();
             }
+        }
+
+        private void FixedUpdate()
+        {
+            GameState.Instance.CurrScore = Difficulty;
         }
 
         // Universal default: the board is fully cleared (every container empty, nothing left

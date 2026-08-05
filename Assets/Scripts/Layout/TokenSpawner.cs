@@ -14,17 +14,18 @@ public class TokenSpawner : MonoBehaviour
     public static TokenSpawner Instance;
     [SerializeField] private Token tokenPrefab;
     [SerializeField] private List<AnimationGroup> animations;
-    
+    [SerializeField] private AnimationGroup directionAnimations;
+
     void Awake()
     {
         Instance = this;
     }
     
-    public Token SpawnToken(int group, Vector3 worldPosition)
+    public Token SpawnToken(int group, Vector3 worldPosition, bool byTier = false)
     {
         Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, transform);
         token.Group = group;
-        ApplyAnimation(token);
+        ApplyAnimation(token, byTier);
         return token;
     }
 
@@ -32,28 +33,53 @@ public class TokenSpawner : MonoBehaviour
     // duplicated line-for-line in all five. Skipped once emoji art is wired up for the group
     // (HasAnimation) - tinting emoji art with the flat placeholder color would just fight its own
     // colors.
-    public Token SpawnColoredToken(int group, Vector3 worldPosition)
+    public Token SpawnColoredToken(int group, Vector3 worldPosition, bool byTier = false)
     {
-        Token token = SpawnToken(group, worldPosition);
+        Token token = SpawnToken(group, worldPosition, byTier);
         if (!token.HasAnimation) token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
         return token;
     }
 
-    // Resolves this token's current Group/Tier to an AnimationClip (each AnimationGroup is one
-    // merge hierarchy; `clips` is indexed by tier within it) and assigns it. Called at spawn, and
+    // Resolves this token's Group to an AnimationClip. Most zones don't care which entry in the
+    // group's list a token shows - Tier only means something to Merge (2048-style), so everyone
+    // else gets an arbitrary entry instead of always the first. Merge passes byTier so its clip
+    // stays pinned to the actual merge level (clips indexed by tier within the group) - called
     // again by anything that changes a token's Tier after the fact (a merge result), since the
     // clip needs to track whichever tier the token is actually showing.
-    public void ApplyAnimation(Token token)
+    public void ApplyAnimation(Token token, bool byTier = false)
     {
         if (animations == null || token.Group < 0 || token.Group >= animations.Count) return;
 
         List<AnimationClip> clips = animations[token.Group].clips;
         if (clips == null || clips.Count == 0) return;
 
-        AnimationClip clip = clips[Mathf.Clamp(token.Tier, 0, clips.Count - 1)];
-        token.SetAnimationClip(clip);
+        int index = byTier ? Mathf.Clamp(token.Tier, 0, clips.Count - 1) : Random.Range(0, clips.Count);
+        token.SetAnimationClip(clips[index]);
     }
-    
+
+    // Parking Jam: the escape piece's own resting sprite is the direction cue - overrides
+    // whatever ApplyAnimation picked from the per-group list with one of the four direction
+    // clips instead. Replaces the old separate triangle-arrow overlay entirely.
+    public void ApplyDirectionAnimation(Token token, Vector2Int direction)
+    {
+        if (directionAnimations?.clips == null) return;
+
+        int index = DirectionIndex(direction);
+        if (index < 0 || index >= directionAnimations.clips.Count) return;
+
+        token.SetAnimationClip(directionAnimations.clips[index]);
+    }
+
+    // Matches the clip authoring order: 0 up, 1 down, 2 left, 3 right.
+    static int DirectionIndex(Vector2Int direction)
+    {
+        if (direction == Vector2Int.up) return 0;
+        if (direction == Vector2Int.down) return 1;
+        if (direction == Vector2Int.left) return 2;
+        if (direction == Vector2Int.right) return 3;
+        return -1;
+    }
+
         // Multi-cell pieces (Block Puzzle, Parking Jam) are still one Token with a longer
     // CellOffsets list - the extra cells just need a visual, so this bolts on a plain child
     // sprite per extra offset (reusing the base token's sprite/color), parented with

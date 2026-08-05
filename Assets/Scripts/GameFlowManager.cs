@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -8,16 +9,24 @@ public enum FlowState { Menu, Playing, Paused, Won, Lost }
 // times the player has advanced, and which zone is active. A reload is the only way this project
 // resets a zone - BaseZone regenerates everything fresh in Start() - so every transition except
 // Pause/Resume goes through one. DifficultyLevel survives the reload and is read by BaseZone (via
-// Scaled()) to size the next zone instance. ZoneIndex survives it too and is read by Spawner (mod
-// its own zone count, which this class has no business knowing) to pick which zone to activate -
-// this is the sole owner of that counter now; Spawner only ever reads it.
+// Scaled()) to size the next zone instance. CurrentZoneIndex survives it too and is read by Spawner
+// to pick which zone to activate - this is the sole owner of it now; Spawner only ever reads it.
+//
+// Zone selection is a shuffle-bag: Spawner reports its zone count via RegisterZoneCount every
+// Start() (so it's always current before any advance can fire), and each advance draws a random
+// index out of the "not yet seen this cycle" pool rather than incrementing sequentially - that
+// pool refills once it's exhausted, which is what keeps every zone appearing once before any
+// repeat while still making immediate back-to-back repeats unlikely.
 public class GameFlowManager : MonoBehaviour
 {
     public static GameFlowManager Instance;
 
     public FlowState State { get; private set; } = FlowState.Menu;
     public int DifficultyLevel { get; private set; } = 0;
-    public int ZoneIndex { get; private set; } = 0;
+    public int CurrentZoneIndex { get; private set; } = 0;
+
+    int zoneCount = 0;
+    readonly List<int> unseenZones = new List<int>();
 
     public event Action<FlowState> OnStateChanged;
 
@@ -54,27 +63,54 @@ public class GameFlowManager : MonoBehaviour
     public void StartGame()
     {
         DifficultyLevel = 0;
-        ZoneIndex = 0;
+        PickNextZone();
         Reload(FlowState.Playing);
     }
 
-    // Same difficulty, same zone, fresh layout - retry doesn't punish or reward the player.
-    public void RetryZone() => Reload(FlowState.Playing);
+    // Same zone, fresh layout. Difficulty resets too - a retry follows a loss, so it shouldn't
+    // carry the failed difficulty into the next attempt.
+    public void RetryZone()
+    {
+        DifficultyLevel = 0;
+        Reload(FlowState.Playing);
+    }
 
-    // Win path: harder, and the next zone in Spawner's list.
+    // Win path: harder, and a fresh random zone.
     public void NextLevel()
     {
         DifficultyLevel++;
-        ZoneIndex++;
+        PickNextZone();
         Reload(FlowState.Playing);
     }
 
     // Dev shortcut for cycling zones without going through a win (Spawner's R-key binding) -
-    // same counter NextLevel uses, just without the difficulty bump.
+    // draws from the same shuffle bag NextLevel uses, just without the difficulty bump.
     public void CycleZone()
     {
-        ZoneIndex++;
+        PickNextZone();
         Reload(FlowState.Playing);
+    }
+
+    // Called by Spawner every Start() so the count used here always matches what's actually in
+    // the scene, even if it changes between edits.
+    public void RegisterZoneCount(int count)
+    {
+        zoneCount = count;
+    }
+
+    void PickNextZone()
+    {
+        if (zoneCount <= 0) return;
+
+        // Bag empty (first pick, or every zone has come up once this cycle) - refill and start over.
+        if (unseenZones.Count == 0)
+        {
+            for (int i = 0; i < zoneCount; i++) unseenZones.Add(i);
+        }
+
+        int pick = unseenZones[UnityEngine.Random.Range(0, unseenZones.Count)];
+        unseenZones.Remove(pick);
+        CurrentZoneIndex = pick;
     }
 
     public void ReturnToMenu() => Reload(FlowState.Menu);

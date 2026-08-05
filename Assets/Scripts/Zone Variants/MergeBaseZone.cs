@@ -53,7 +53,7 @@ public class MergeBaseZone : BaseZone
         for (int i = 0; i < tokenGroups.Count; i++)
         {
             Container cell = containers[i];
-            Token token = TokenSpawner.Instance.SpawnColoredToken(tokenGroups[i], grid.CellToWorld(cell.OrderedCells[0]));
+            Token token = TokenSpawner.Instance.SpawnColoredToken(tokenGroups[i], grid.CellToWorld(cell.OrderedCells[0]), byTier: true);
             cell.TryAccept(token);
         }
     }

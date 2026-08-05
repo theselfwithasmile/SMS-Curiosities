@@ -40,6 +40,15 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // shouldn't let ANY drag, in any direction or distance, trigger an escape).
     public Vector2Int EscapeDirection;
 
+    // The absolute grid cell CellOffsets is anchored to, baked in at spawn (ParkingJamBaseZone
+    // already knows it exactly - see CommitLayout). ResolveEscapeDrag uses this directly instead
+    // of re-deriving it from originalPosition via Grid.WorldToCell, since Grid recomputes its
+    // cellSize/origin from the camera every frame (Grid.Update) - any drift there (e.g. the Game
+    // view being resized mid-session) would make that re-derived cell disagree with the piece's
+    // true committed body, clearing the wrong cells on escape and leaving a still-present car's
+    // body wrongly marked free for whatever piece checks that lane next.
+    public Vector2Int AnchorCell;
+
     // Fired right as this piece clears its lane and leaves the board - ParkingJamBaseZone uses it
     // to track how many cars are still in play for its win check, without Token needing to know
     // anything about zones or win conditions itself.
@@ -58,7 +67,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     float zDistance;
     bool dragAllowed;
     Coroutine activeMoveTween;
-    Transform escapeArrow;
 
     // The AnimationClips TokenSpawner assigns are ordinary (non-legacy) clips authored in the
     // Animation window, not legacy clips - the old Animation component can't play those at all,
@@ -76,41 +84,9 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // color tint) skip work that would otherwise fight the emoji art's own colors.
     public bool HasAnimation => currentClip != null;
 
-    static Mesh arrowMesh;
-
     void Awake()
     {
         GetComponent<SpriteRenderer>().color = GameState.Instance.SecondaryGroupColor(Group);
-    }
-
-    // Parking Jam: a small triangle child pointing along EscapeDirection, sitting at the body's
-    // head cell (CellOffsets' last entry - ParkingJamBaseZone builds offsets in the same
-    // tail-to-head order as the car's body). Built procedurally, same as GridRenderer's own
-    // quads/dots - there's no art asset for this yet, and one triangle doesn't need one.
-    public void ShowEscapeArrow()
-    {
-        if (arrowMesh == null) arrowMesh = GridRenderer.BuildArrowMesh();
-
-        var arrowObject = new GameObject("EscapeArrow");
-
-        // World-space position/rotation/scale first, then reparent with worldPositionStays -
-        // same trick TokenSpawner uses for the extra cell sprites. The token root's own prefab
-        // scale isn't 1 (see Token.prefab), so setting localPosition/localScale directly under
-        // it (as this used to) put the arrow 3x too far from the head cell and 3x oversized.
-        Vector2Int headOffset = CellOffsets[CellOffsets.Count - 1];
-        arrowObject.transform.position = transform.position + (Vector3)((Vector2)headOffset * Grid.Instance.CellSize);
-        arrowObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, new Vector3(EscapeDirection.x, EscapeDirection.y, 0f));
-        arrowObject.transform.localScale = Vector3.one * (Grid.Instance.CellSize * 0.5f);
-        arrowObject.transform.SetParent(transform, true);
-
-        var meshFilter = arrowObject.AddComponent<MeshFilter>();
-        meshFilter.mesh = arrowMesh;
-
-        var meshRenderer = arrowObject.AddComponent<MeshRenderer>();
-        meshRenderer.material = GridRenderer.BuildMaterial(Color.white);
-        meshRenderer.sortingOrder = GetComponent<SpriteRenderer>().sortingOrder + 1;
-
-        escapeArrow = arrowObject.transform;
     }
 
     // The graph is driven entirely by hand (never PlayableGraph.Play()) - deliberately, so this
@@ -355,8 +331,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // slide simulation needed at all.
     void ResolveEscapeDrag()
     {
-        Vector2Int anchor = Grid.Instance.WorldToCell(originalPosition);
-
         // Continuous world-space movement, not grid-cell movement - a cell can easily span a
         // large chunk of the screen, so requiring the drop to have crossed into a whole different
         // cell before even registering direction would make ordinary drags never trigger at all.
@@ -384,16 +358,9 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             }
         }
 
-        SetFootprintOccupied(anchor, false);
+        SetFootprintOccupied(AnchorCell, false);
         OnEscaped?.Invoke();
-        if (escapeArrow != null)
-        {
-            TweenRunner.Instance.PulseThenShrinkAndDestroy(this, escapeArrow);
-        }
-        else
-        {
-            TweenRunner.Instance.ShrinkAndDestroy(this);
-        }
+        TweenRunner.Instance.ShrinkAndDestroy(this);
     }
 
     void SetFootprintOccupied(Vector2Int anchor, bool occupied)

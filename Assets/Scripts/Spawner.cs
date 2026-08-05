@@ -7,14 +7,18 @@ public class Spawner : MonoBehaviour
 {
     [SerializeField] List<BaseZone> zones;
 
-    // GameFlowManager owns the ever-incrementing zone counter (it survives reloads and is shared
-    // with NextLevel's difficulty bump); only this class knows how many zones actually exist, so
-    // the wrap-around lives here. Absent (not yet wired into the scene), falls back to zone 0.
-    int CurrentZoneIndex => GameFlowManager.Instance != null ? GameFlowManager.Instance.ZoneIndex % zones.Count : 0;
+    // GameFlowManager owns which zone is current (it survives reloads and picks randomly without
+    // repeats); only this class knows how many zones actually exist, so it reports that count back
+    // every Start(). Absent (not yet wired into the scene), falls back to zone 0.
+    int CurrentZoneIndex => GameFlowManager.Instance != null ? GameFlowManager.Instance.CurrentZoneIndex % zones.Count : 0;
 
     // Start is called before the first frame update
     void Start()
     {
+        // Always keep GameFlowManager's zone count current, even on a Menu-state load, so it's
+        // ready the moment Start/Retry/NextLevel/CycleZone needs to draw a zone.
+        GameFlowManager.Instance?.RegisterZoneCount(zones.Count);
+
         // Gated on GameFlowManager so a fresh load lands on the menu instead of dropping straight
         // into a zone - absent (not yet wired into the scene), falls back to the old always-on
         // behaviour. A reload triggered mid-game (R-key zone cycling, Retry, Next Level) already

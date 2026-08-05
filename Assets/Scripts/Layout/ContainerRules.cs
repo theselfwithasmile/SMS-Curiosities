@@ -176,10 +176,6 @@ public class SwapInteraction : IOccupantInteraction
             matchedTokens.Add(token);
         }
         TweenRunner.Instance.ShrinkAndDestroySequential(matchedTokens);
-
-        Vector2Int spawnCell = outputDestination.NextAvailableCell();
-        //Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
-        //outputDestination.TryAccept(grouped);
     }
 
     void AddSameGroupNeighbors(Container from, int group, HashSet<Container> claimed, List<Container> frontier)

@@ -15,7 +15,7 @@ public class ToonBlastBaseZone : BaseZone
     // The bench here only ever gains tokens gradually (one grouped token per match cleared, not
     // pre-filled at generation like Water Sort's), so a modest fixed capacity is fine rather than
     // trying to predict an exact total up front.
-    protected override int BenchCapacity => Mathf.Max(1, boardSize);
+    //protected override int BenchCapacity => Mathf.Max(1, boardSize);
 
     protected override List<Container> GenerateContainers()
     {
