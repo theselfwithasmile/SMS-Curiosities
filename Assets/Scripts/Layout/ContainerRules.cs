@@ -19,6 +19,23 @@ public class FullPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count >= container.Capacity;
 }
 
+// Completes only when the container is full AND every member shares the same group.
+// Used by shelf-sort style zones where tokens can be placed freely (no GroupMatchConstraint),
+// so a full-but-mixed container should not trigger resolution.
+public class FullAndSameGroupPredicate : ICompletionPredicate
+{
+    public bool IsComplete(Container container)
+    {
+        if (container.Members.Count < container.Capacity) return false;
+        int group = container.Members[0].Group;
+        for (int i = 1; i < container.Members.Count; i++)
+        {
+            if (container.Members[i].Group != group) return false;
+        }
+        return true;
+    }
+}
+
 public class EmptyPredicate : ICompletionPredicate
 {
     public bool IsComplete(Container container) => container.Members.Count == 0;
@@ -156,8 +173,8 @@ public class SwapInteraction : IOccupantInteraction
         TweenRunner.Instance.ShrinkAndDestroySequential(matchedTokens);
 
         Vector2Int spawnCell = outputDestination.NextAvailableCell();
-        Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
-        outputDestination.TryAccept(grouped);
+        //Token grouped = TokenSpawner.Instance.SpawnColoredToken(group, Grid.Instance.CellToWorld(spawnCell));
+        //outputDestination.TryAccept(grouped);
     }
 
     void AddSameGroupNeighbors(Container from, int group, HashSet<Container> claimed, List<Container> frontier)

@@ -26,7 +26,6 @@ public class WaterSortBaseZone : BaseZone
         {
             EntryConstraint = new GroupMatchConstraint(),
             CompletionPredicate = new FullPredicate(),
-            Resolution = new SpawnTokenResolution(bench),
         }.ApplyToAll(tubes);
 
         return tubes;

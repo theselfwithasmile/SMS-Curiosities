@@ -1,12 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Variants;
 
 public class Spawner : MonoBehaviour
 {
     [SerializeField] List<BaseZone> zones;
+
+    // GameFlowManager owns the ever-incrementing zone counter (it survives reloads and is shared
+    // with NextLevel's difficulty bump); only this class knows how many zones actually exist, so
+    // the wrap-around lives here. Absent (not yet wired into the scene), falls back to zone 0.
+    int CurrentZoneIndex => GameFlowManager.Instance != null ? GameFlowManager.Instance.ZoneIndex % zones.Count : 0;
 
     // Start is called before the first frame update
     void Start()
@@ -17,7 +21,7 @@ public class Spawner : MonoBehaviour
         // carries State == Playing across on GameFlowManager's DontDestroyOnLoad instance.
         if (GameFlowManager.Instance == null || GameFlowManager.Instance.State == FlowState.Playing)
         {
-            ActivateZone(GameState.Instance.currZoneIdx);
+            ActivateZone(CurrentZoneIndex);
         }
     }
 
@@ -26,7 +30,7 @@ public class Spawner : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            ActivateNextZone();
+            GameFlowManager.Instance?.CycleZone();
         }
     }
 
@@ -38,13 +42,5 @@ public class Spawner : MonoBehaviour
         //enable the requested one
         zones[idx].gameObject.SetActive(true);
         zones[idx].enabled = true;
-    }
-
-    void ActivateNextZone()
-    {
-        GameState.Instance.currZoneIdx = (GameState.Instance.currZoneIdx + 1) % zones.Count;
-
-        //reload scene so the new zone starts from a clean state
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
