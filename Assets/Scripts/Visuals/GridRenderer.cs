@@ -4,50 +4,7 @@ using UnityEngine;
 
 public class GridRenderer : MonoBehaviour
 {
-    public static GridRenderer Instance;
-    
-    [SerializeField] float dotScale = 0.15f;
-    [SerializeField] Color dotColor = Color.white;
-
     const int MaxInstancesPerBatch = 1023;
-
-    Mesh dotMesh;
-    Material dotMaterial;
-
-    void Awake()
-    {
-        Instance = this;
-        dotMesh = BuildDotMesh();
-        dotMaterial = BuildMaterial(dotColor);
-    }
-
-
-    // Update is called once per frame
-    void Update()
-    {
-        DrawEmptyCells();
-    }
-
-    void DrawEmptyCells()
-    {
-        int columns = Grid.Instance.Columns;
-        int totalRows = Grid.Instance.TotalRows;
-        float cellSize = Grid.Instance.CellSize;
-
-        var matrices = new List<Matrix4x4>(columns * totalRows);
-        for (int y = 0; y < totalRows; y++)
-        {
-            for (int x = 0; x < columns; x++)
-            {
-                var cell = new Vector2Int(x, y);
-                if (Grid.Instance.IsOccupied(cell)) continue;
-
-                Vector3 center = Grid.Instance.CellToWorld(cell);
-                matrices.Add(Matrix4x4.TRS(center, Quaternion.identity, Vector3.one * (cellSize * dotScale)));
-            }
-        }
-        DrawBatched(dotMesh, dotMaterial, matrices);
-    }
 
     public static void DrawBatched(Mesh mesh, Material material, List<Matrix4x4> matrices)
     {
@@ -58,26 +15,6 @@ public class GridRenderer : MonoBehaviour
             int count = Mathf.Min(MaxInstancesPerBatch, matrices.Count - start);
             Graphics.DrawMeshInstanced(mesh, 0, material, matrices.GetRange(start, count));
         }
-    }
-
-    static Mesh BuildDotMesh(int segments = 16)
-    {
-        var vertices = new Vector3[segments + 1];
-        var triangles = new int[segments * 3];
-
-        vertices[0] = Vector3.zero;
-        for (int i = 0; i < segments; i++)
-        {
-            float angle = i / (float)segments * Mathf.PI * 2f;
-            vertices[i + 1] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * 0.5f;
-
-            int triIndex = i * 3;
-            triangles[triIndex] = 0;
-            triangles[triIndex + 1] = i + 1;
-            triangles[triIndex + 2] = i + 2 > segments ? 1 : i + 2;
-        }
-
-        return BuildMesh("Dot", vertices, triangles);
     }
 
     public static Mesh BuildMesh(string name, Vector3[] vertices, int[] triangles)

@@ -280,7 +280,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &117866550
 RectTransform:
   m_ObjectHideFlags: 0
@@ -808,6 +808,18 @@ MonoBehaviour:
     - {fileID: 7400000, guid: 244217efb09ba1e4eaaf6aed974430af, type: 2}
     - {fileID: 7400000, guid: 931adfa488d8a244dbc9f4d06c7fb59d, type: 2}
     - {fileID: 7400000, guid: a3fa0cf7e4c0bb0419f44291f3692219, type: 2}
+  - clips:
+    - {fileID: 7400000, guid: 068a471a4c53aa443965ca70f2091a4d, type: 2}
+    - {fileID: 7400000, guid: 962cf26f02468e9449ba035c4c3ded47, type: 2}
+    - {fileID: 7400000, guid: 79abd240fd8a8564c83e0c72030bf693, type: 2}
+    - {fileID: 7400000, guid: b4c57fef244b52044873f9fa96340435, type: 2}
+    - {fileID: 7400000, guid: a43c431bf5e468c46a022235006c3db9, type: 2}
+  - clips:
+    - {fileID: 7400000, guid: 1356a069fe36d084384aa56eeace70e2, type: 2}
+    - {fileID: 7400000, guid: 0defec0eb02a186418ac9b4ac4372820, type: 2}
+    - {fileID: 7400000, guid: c9dd5b3ecb4f6244b90bcc26889765bd, type: 2}
+    - {fileID: 7400000, guid: 72da20b5807ba064e8f7b25fdb6a1d11, type: 2}
+    - {fileID: 7400000, guid: 770ebbd2af1656942b994dec5e8a33ca, type: 2}
   directionAnimations:
     clips:
     - {fileID: 7400000, guid: 201be5875d08d2a4484c73694af7bc4b, type: 2}
@@ -847,8 +859,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8649d4c81a6aa5947a33c1bf1e923e6f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dotScale: 0.1
-  dotColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &459298497
 GameObject:
   m_ObjectHideFlags: 0
@@ -1970,12 +1980,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_UiScaleMode: 0
+  m_UiScaleMode: 1
   m_ReferencePixelsPerUnit: 100
   m_ScaleFactor: 1
-  m_ReferenceResolution: {x: 800, y: 600}
+  m_ReferenceResolution: {x: 1080, y: 1920}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 0
+  m_MatchWidthOrHeight: 1
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -3415,8 +3425,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1.89, y: 17.7}
-  m_SizeDelta: {x: 423.44, y: 45.3}
+  m_AnchoredPosition: {x: 1.89, y: 27}
+  m_SizeDelta: {x: 423.44, y: 11}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1757430839
 MonoBehaviour:
@@ -3869,22 +3879,24 @@ MonoBehaviour:
   mousePos: {x: 0, y: 0}
   guideText: {fileID: 1757430839}
   guideSpec:
-  - Tiles combine only when color and level both match exactly; once a token hits
-    the top level, drag it off the board to score it instead of merging it further
-  - A car only escapes if you drag it toward its own marked exit with a fully clear
-    lane; any other drag just snaps it back, even if the lane looks open.
-  - "Two same-colored tiles only connect if an actually-open path exists between
-    them right now, however winding \u2014 matching color alone isn't enough."
-  - "A blast only checks the tile you actually swap onto, right after it lands \u2014
-    not empty gaps, and not wherever you were aiming mid-drag."
-  - A tube only clears once it's completely full of one color; one mismatched token
-    anywhere in it holds the whole tube back.
+  - Stacking two identical emojis might merge them, the maxed-out ones shall be swapped
+    clean out of the chat.
+  - Try dragging the hands to where they are pointing, the group might go away so
+    long as the path is clear
+  - ' Try dragging emojis into another of the same family, they might clear up if
+    there exists an unobstructed connection path'
+  - Try swapping an emoji with another one, same-family neighbors shall be provoked
+    to leave.
+  - ' Try filling a chat bubble completely with one family, though it only accepts
+    new entries sharing the same family'
   scoreText: {fileID: 1152062258}
   CurrScore: 0
   groupColors:
   - {r: 0.6216852, g: 0.53396225, b: 1, a: 1}
   - {r: 0.5414382, g: 0.85660374, b: 0.64283997, a: 1}
   - {r: 1, g: 0.57924527, b: 0.57924527, a: 1}
+  - {r: 1, g: 0.8462036, b: 0.4056604, a: 1}
+  - {r: 0.4056604, g: 0.7476813, b: 1, a: 1}
   BubbleColor: {r: 0, g: 0.5, b: 1, a: 1}
 --- !u!4 &1857024230
 Transform:
@@ -4022,7 +4034,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -9, y: 648.2}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 100, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1866210804
 MonoBehaviour:
@@ -4357,6 +4369,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2072011649}
   - component: {fileID: 2072011650}
+  - component: {fileID: 2072011652}
+  - component: {fileID: 2072011651}
   m_Layer: 0
   m_Name: Zone Manager
   m_TagString: Untagged
@@ -4398,6 +4412,79 @@ MonoBehaviour:
   - {fileID: 503054024}
   - {fileID: 331776023}
   - {fileID: 1773291091}
+--- !u!95 &2072011651
+Animator:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2072011647}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 487dd7cedee360443a653ec58003f415, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!212 &2072011652
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2072011647}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1, y: 1}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 0
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
 --- !u!1 &2109685380
 GameObject:
   m_ObjectHideFlags: 0

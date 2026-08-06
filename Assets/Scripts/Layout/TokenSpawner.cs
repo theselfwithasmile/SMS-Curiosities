@@ -119,6 +119,8 @@ public class TokenSpawner : MonoBehaviour
             renderer.sprite = baseRenderer.sprite;
             renderer.color = baseRenderer.color;
             renderer.sortingOrder = baseRenderer.sortingOrder;
+
+            token.CellParts.Add(child.transform);
         }
         return token;
     }

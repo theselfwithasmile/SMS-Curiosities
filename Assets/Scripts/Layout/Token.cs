@@ -49,6 +49,13 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     // body wrongly marked free for whatever piece checks that lane next.
     public Vector2Int AnchorCell;
 
+    // The extra per-cell sprites SpawnMultiCellToken creates for a multi-cell token (Block
+    // Puzzle, Parking Jam), in the same order as CellOffsets[1..] (head-to-tail - index 0, the
+    // head, is this Token's own SpriteRenderer, not a separate child). Empty for an ordinary
+    // single-cell token. Used by TweenRunner.CascadeShrinkAndDestroy to shrink a car's body out
+    // tail-first instead of vanishing as one block.
+    public List<Transform> CellParts = new List<Transform>();
+
     // Fired right as this piece clears its lane and leaves the board - ParkingJamBaseZone uses it
     // to track how many cars are still in play for its win check, without Token needing to know
     // anything about zones or win conditions itself.
@@ -364,7 +371,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
         SetFootprintOccupied(AnchorCell, false);
         OnEscaped?.Invoke();
-        TweenRunner.Instance.ShrinkAndDestroy(this);
+        TweenRunner.Instance.CascadeShrinkAndDestroy(this);
     }
 
     void SetFootprintOccupied(Vector2Int anchor, bool occupied)

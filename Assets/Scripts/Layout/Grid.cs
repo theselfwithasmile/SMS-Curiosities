@@ -124,7 +124,7 @@ public class Grid : MonoBehaviour
     // Deliberately scoped to the puzzle rows only, not TotalRows - this backs geometry/adjacency
     // logic (e.g. ContainerManager.Neighbors, used by flood-fill matching), and bench cells
     // shouldn't ever be treated as puzzle-board neighbors just because they happen to sit
-    // adjacent to the board's edge row. WorldToCell/DrawEmptyCells intentionally use TotalRows
+    // adjacent to the board's edge row. WorldToCell intentionally uses TotalRows
     // instead, since a bench does need to be reachable by drops and visible on screen.
     public bool IsInBounds(Vector2Int cell)
     {

@@ -66,6 +66,17 @@ public class TweenRunner : MonoBehaviour
         StartCoroutine(ShrinkAndDestroySequentialRoutine(list, stagger, duration));
     }
 
+    // Parking Jam-style counterpart to ShrinkAndDestroySequential for a token whose "members" are
+    // its own child cell sprites rather than separate Tokens (a car is one Token - see
+    // Token.CellParts). Cascades tail-first: CellParts is stored head-to-tail, so walking it
+    // backwards starts with the cell farthest from the head. The head itself is this Token's own
+    // SpriteRenderer, not a CellParts entry - it shrinks last, once every trailing cell's shrink
+    // has already started, and only then is the token actually destroyed.
+    public void CascadeShrinkAndDestroy(Token token, float stagger = 0.05f, float duration = 0.15f)
+    {
+        StartCoroutine(CascadeShrinkAndDestroyRoutine(token, stagger, duration));
+    }
+
     // Grow-in with a slight overshoot before settling - for a token that's the *result* of
     // something (a merge), as opposed to GrowIn's plain 0-to-1 used for a buried reveal.
     public void PopIn(Transform target, float overshoot = 1.15f, float duration = 0.18f)
@@ -165,6 +176,22 @@ public class TweenRunner : MonoBehaviour
             if (token != null) StartCoroutine(ShrinkAndDestroyRoutine(token, duration));
             yield return new WaitForSeconds(stagger);
         }
+    }
+
+    IEnumerator CascadeShrinkAndDestroyRoutine(Token token, float stagger, float duration)
+    {
+        if (token == null) yield break;
+        DisableCollider(token);
+
+        for (int i = token.CellParts.Count - 1; i >= 0; i--)
+        {
+            Transform part = token.CellParts[i];
+            if (part != null) StartCoroutine(ScaleRoutine(part, part.localScale, Vector3.zero, duration, EaseInCubic));
+            yield return new WaitForSeconds(stagger);
+        }
+
+        if (token != null) yield return ScaleRoutine(token.transform, token.transform.localScale, Vector3.zero, duration, EaseInCubic);
+        if (token != null) Destroy(token.gameObject);
     }
 
     IEnumerator PopInRoutine(Transform target, float overshoot, float duration)

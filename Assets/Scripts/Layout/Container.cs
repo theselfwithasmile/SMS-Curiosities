@@ -56,22 +56,11 @@ public class Container
     public readonly List<Vector2Int> OrderedCells;
     public readonly HashSet<Vector2Int> Cells;
     public readonly Color Color;
-    // Always the exact rect OrderedCells fills - containers are generated/placed as rects only,
-    // so this is what the container prefab's SpriteRenderer is sized/positioned from, rather than
-    // re-deriving bounds from OrderedCells (which, for a fixed container built over already-
-    // claimed cells, can end up smaller than the rect it was requested with).
     public readonly RectInt Bounds;
     public readonly List<Token> Members = new List<Token>();
 
-    // Which token (if any) currently occupies each of this container's cells - lets a container
-    // spanning more than one cell (Water Sort's shelf-sort tubes, Block Puzzle's row/column
-    // containers) accept a token into the exact cell it was dropped on instead of always
-    // compacting into fill order.
+    //which token (if any) currently occupies each of this container's cells
     readonly Dictionary<Vector2Int, Token> occupantByCell = new Dictionary<Vector2Int, Token>();
-
-    // Per-cell burial stacks - each cell buries independently of its neighbours, so vacating one
-    // cell (picked up and moved away, consumed, or cleared) reveals only what was stacked under
-    // THAT cell rather than an arbitrary "next" slot elsewhere in the container.
     readonly Dictionary<Vector2Int, Queue<Token>> buriedByCell = new Dictionary<Vector2Int, Queue<Token>>();
 
     public readonly List<IEntryConstraint> EntryConstraints = new List<IEntryConstraint>();
@@ -100,8 +89,7 @@ public class Container
         Bounds = bounds;
     }
 
-    // First cell (in layout order) not currently occupied - used by callers that don't care which
-    // exact cell they land in (single-cell containers, generation-time compact fill).
+    //first cell not currently occupied
     public Vector2Int NextAvailableCell()
     {
         foreach (Vector2Int cell in OrderedCells)

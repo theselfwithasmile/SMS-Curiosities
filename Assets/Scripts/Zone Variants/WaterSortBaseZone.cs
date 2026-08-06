@@ -93,6 +93,22 @@ public class WaterSortBaseZone : BaseZone
             totalBuried += count;
         }
 
+        // BuildQuotaMatchedGroups only guarantees every group's total is a QuotaFactor multiple
+        // when the pool size itself is one (otherwise its leftover remainder gets handed out as
+        // single-token stragglers) - visibleCount already is, but totalBuried is an arbitrary sum
+        // of independent per-slot rolls, so trim it down to the nearest multiple first. Otherwise
+        // a stray buried token or two leaves some colour with a leftover that can never fill a
+        // whole tube, permanently soft-locking the puzzle.
+        int overflow = totalBuried % QuotaFactor;
+        while (overflow > 0)
+        {
+            int slot = Random.Range(0, visibleCount);
+            if (buriedCounts[slot] <= 0) continue;
+            buriedCounts[slot]--;
+            totalBuried--;
+            overflow--;
+        }
+
         List<int> tokenGroups = ContainerManager.BuildQuotaMatchedGroups(
             visibleCount + totalBuried, EffectiveTubeCount, QuotaFactor);
         ContainerManager.Shuffle(tokenGroups);
