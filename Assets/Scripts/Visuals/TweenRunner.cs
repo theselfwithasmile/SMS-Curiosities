@@ -2,10 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Small coroutine-based tween helper. The project has no tweening library and doesn't need
-// one yet - every effect here is a plain lerp over a couple hundred milliseconds. Self-
-// instantiating (unlike the other manager singletons) since it has no serialized fields and
-// nothing to wire up in the scene - callers just reach for TweenRunner.Instance cold.
 public class TweenRunner : MonoBehaviour
 {
     static TweenRunner instance;
@@ -22,25 +18,20 @@ public class TweenRunner : MonoBehaviour
         }
     }
 
-    // Returns the Coroutine handle so a caller can cancel it (via StopCoroutine on this same
-    // instance) if the target gets grabbed again mid-flight - otherwise the tween and whatever
-    // repositions the target next (a fresh drag) fight over transform.position every frame.
+    //returns the Coroutine handle so a caller can cancel it (via StopCoroutine on this same instance)
+    //if the target gets grabbed again mid-flight
     public Coroutine MoveTo(Transform target, Vector3 destination, float duration = 0.15f)
     {
         return StartCoroutine(MoveRoutine(target, destination, duration));
     }
 
-    // Grab feedback: a quick up-then-back bounce on the current scale, not an absolute one -
-    // so it still reads correctly on multi-cell tokens whose prefab scale isn't 1.
+    // Grab feedback: a quick up-then-back bounce on the current scale
     public void PickupPop(Transform target, float peakScale = 1.12f, float duration = 0.12f)
     {
         StartCoroutine(PopRoutine(target, peakScale, duration));
     }
 
-    // Reveal-from-buried: grows in from nothing rather than just appearing, since the token was
-    // fully hidden (SetRevealed(false)) up to this point, not merely offscreen. Grows to the
-    // target's own current scale (not a hardcoded Vector3.one) - same reasoning as PickupPop -
-    // so it still reads correctly on a prefab whose authored scale isn't 1.
+    // Reveal-from-buried: grows in from nothing rather than just appearing
     public void GrowIn(Transform target, float duration = 0.15f)
     {
         StartCoroutine(ScaleRoutine(target, Vector3.zero, target.localScale, duration, EaseOutCubic));
@@ -51,14 +42,7 @@ public class TweenRunner : MonoBehaviour
         StartCoroutine(ShrinkAndDestroyRoutine(token, duration));
     }
 
-    // Starts each token's shrink a beat apart instead of all at once, so a container clearing
-    // several members at once reads as a small cascade rather than a single flash. Copies
-    // `tokens` synchronously (before the first yield) since callers typically pass
-    // Container.Members and clear it themselves right after calling this. Colliders are disabled
-    // for every token right here, up front - these tokens are already logically Consume()'d
-    // (CurrentContainer null) by the time this is called, so leaving later-staggered ones
-    // clickable would let a fast drag grab an already-cleared "zombie" token before its own turn
-    // in the stagger loop reaches it.
+    // Starts each token's shrink a beat apart instead of all at once
     public void ShrinkAndDestroySequential(IEnumerable<Token> tokens, float stagger = 0.05f, float duration = 0.15f)
     {
         var list = new List<Token>(tokens);
@@ -66,27 +50,20 @@ public class TweenRunner : MonoBehaviour
         StartCoroutine(ShrinkAndDestroySequentialRoutine(list, stagger, duration));
     }
 
-    // Parking Jam-style counterpart to ShrinkAndDestroySequential for a token whose "members" are
-    // its own child cell sprites rather than separate Tokens (a car is one Token - see
-    // Token.CellParts). Cascades tail-first: CellParts is stored head-to-tail, so walking it
-    // backwards starts with the cell farthest from the head. The head itself is this Token's own
-    // SpriteRenderer, not a CellParts entry - it shrinks last, once every trailing cell's shrink
-    // has already started, and only then is the token actually destroyed.
+    //for a token whose members are its own child cell sprites rather than separate Tokens
     public void CascadeShrinkAndDestroy(Token token, float stagger = 0.05f, float duration = 0.15f)
     {
         StartCoroutine(CascadeShrinkAndDestroyRoutine(token, stagger, duration));
     }
 
-    // Grow-in with a slight overshoot before settling - for a token that's the *result* of
-    // something (a merge), as opposed to GrowIn's plain 0-to-1 used for a buried reveal.
+    //grow-in with a slight overshoot before settling
     public void PopIn(Transform target, float overshoot = 1.15f, float duration = 0.18f)
     {
         StartCoroutine(PopInRoutine(target, overshoot, duration));
     }
 
-    // Both source tokens move onto the same target point and shrink together, then get
-    // destroyed - reads as "combined into" rather than "replaced by". Returns the IEnumerator
-    // itself (not a Coroutine handle) so a caller already running as a coroutine can `yield
+    // Both source tokens move onto the same target point and shrink together, then get destroyed.
+    // Returns the IEnumerator itself (not a Coroutine handle) so a caller already running as a coroutine can `yield
     // return` it directly and pick up right after both tokens are gone.
     public IEnumerator ConvergeAndShrink(Token a, Token b, Vector3 target, float duration = 0.15f)
     {
@@ -160,9 +137,7 @@ public class TweenRunner : MonoBehaviour
     {
         if (token == null) yield break;
 
-        // Destroy is deferred until the shrink finishes, so the GameObject (and its Collider2D)
-        // is still technically alive for the duration - disable it immediately so a fast re-grab
-        // can't drag a token that's already been logically consumed back into play.
+        //destroy is deferred until the shrink finishes so disable to prevent fast re-grab
         DisableCollider(token);
 
         yield return ScaleRoutine(token.transform, token.transform.localScale, Vector3.zero, duration, EaseInCubic);
@@ -196,9 +171,7 @@ public class TweenRunner : MonoBehaviour
 
     IEnumerator PopInRoutine(Transform target, float overshoot, float duration)
     {
-        // Overshoot/settle relative to the token's own current scale (not a hardcoded
-        // Vector3.one) - same reasoning as GrowIn/PickupPop - so a merge result whose prefab
-        // scale isn't 1 doesn't snap to the wrong size once it settles.
+        // Overshoot/settle relative to the token's own current scale
         Vector3 baseScale = target.localScale;
         float growDuration = duration * 0.7f;
         float settleDuration = duration - growDuration;

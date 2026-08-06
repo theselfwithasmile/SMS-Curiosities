@@ -2,18 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Variants;
 
-// Parking Jam (arrow-maze variant): every piece is a bent, self-avoiding body of cells (a plain
-// CellOffsets shape, same mechanism Block Puzzle already uses for non-rectangular pieces) with a
-// fixed escape lane running from its head to the grid boundary. A drag either clears a piece all
-// the way out (every lane cell currently free of every other still-present piece) or reverts it
-// completely - no intermediate resting position ever persists, so the whole layout is monotone: a
-// piece with a clear lane now will still have one later (nothing ever repositions to block it),
-// which is exactly why solvability only needs a simple greedy check instead of a search over
-// joint piece positions.
-//
-// No containers at all - escaping is pure Grid-level occupancy, not container membership - so
-// this rides Zone's shared setup (grid, board sizing) while opting out of containers/groups/bench
-// and using the generate/solve/commit hooks instead of the default single-pass GenerateTokens.
+//very piece is a bent, self-avoiding body of cells with a fixed escape lane
+//running from its head to the grid boundary. A drag either clears a piece all
+//the way out or reverts it completely
 public class ParkingJamBaseZone : BaseZone
 {
     [SerializeField, Range(0f, 1f)] float fillRatio = 0.55f;
@@ -34,19 +25,15 @@ public class ParkingJamBaseZone : BaseZone
     List<CarSpec> pendingLayout;
     int remainingCars;
 
-    // Difficulty here has no natural "count" field to scale (cars come from filling free cells,
-    // not a fixed spec list) - nudging the fill ratio itself is the equivalent knob. Clamped well
-    // short of 1 so generation (which retries up to maxGenerationAttempts on an unsolvable pack)
-    // doesn't start starving for free cells to grow escape lanes through.
+    //Nudging the fill ratio itself is the knob for difficulty
+    //Clamped well short of 1 so generation (which retries up to maxGenerationAttempts on an unsolvable pack)
+    //doesn't start starving for free cells to grow escape lanes through.
     float EffectiveFillRatio => Mathf.Clamp(fillRatio + Difficulty * 0.03f, 0f, 0.85f);
 
     protected override List<Container> GenerateContainers() => new List<Container>();
 
     protected override bool TryGenerateLayout()
     {
-        // boardSize (not the raw grid dimensions) so difficulty's board-growth scaling actually
-        // reaches this zone too - it has no containers/bench to size against, so without this it
-        // was always filling the scene's fixed inspector grid size regardless of boardLength.
         var bounds = new RectInt(0, 0, boardSize, boardSize);
         pendingLayout = GenerateLayout(bounds);
         return pendingLayout != null;
@@ -65,12 +52,7 @@ public class ParkingJamBaseZone : BaseZone
 
         foreach (CarSpec car in pendingLayout)
         {
-            // Anchored at the head (not the tail) - the root Token is what carries the direction
-            // sprite (ApplyDirectionAnimation below), so it has to actually sit at the head cell
-            // for that sprite to visually point at the exit. SpawnMultiCellToken treats offsets[0]
-            // as the root's own cell (no separate child spawned for it), so the head has to be
-            // first in the list - built by walking car.body head-to-tail, the reverse of its own
-            // tail-to-head order.
+            //anchored at the head
             Vector2Int anchor = car.body[car.body.Count - 1];
             var offsets = new List<Vector2Int>(car.body.Count);
             for (int i = car.body.Count - 1; i >= 0; i--) offsets.Add(car.body[i] - anchor);
@@ -90,9 +72,7 @@ public class ParkingJamBaseZone : BaseZone
         }
     }
 
-    // Fills free cells (in random order) with bent pieces until roughly fillRatio of the board is
-    // occupied - walking actual remaining free cells rather than blind-guessing coordinates, so
-    // density scales reliably instead of degrading as the board fills up.
+    //fills free cells (in random order) with bent pieces until roughly fillRatio of the board is occupied
     List<CarSpec> GenerateLayout(RectInt bounds)
     {
         var cars = new List<CarSpec>();
@@ -110,6 +90,8 @@ public class ParkingJamBaseZone : BaseZone
         ContainerManager.Shuffle(freeCells);
 
         //fills grid until targetFilled is reached
+        //walking actual remaining free cells rather than blind-guessing coordinates, so
+        //density scales reliably instead of degrading as the board fills up
         int targetFilled = Mathf.RoundToInt(EffectiveFillRatio * bounds.width * bounds.height); //percentage of grid to be filled
         foreach (Vector2Int cell in freeCells)
         {
@@ -122,9 +104,9 @@ public class ParkingJamBaseZone : BaseZone
         return cars.Count > 0 ? cars : null;
     }
 
-    // Grows a bent, self-avoiding body from `start` - longer target lengths bend more often, so
+    //grows a bent, self-avoiding body from `start` - longer target lengths bend more often, so
     // short pieces read as plain straight/L blockers while long ones wind like a real maze
-    // corridor. Falls back to whatever length it manages if boxed in early (a shorter piece,
+    // corridor.  (a shorter piece,
     // rather than failing the whole cell).
     CarSpec BuildCarAt(Vector2Int start, RectInt bounds, HashSet<Vector2Int> occupied)
     {
@@ -139,7 +121,7 @@ public class ParkingJamBaseZone : BaseZone
         {
             Vector2Int head = body[body.Count - 1];
             Vector2Int? next = StepBody(head, direction, turnChance, bounds, occupied, body);
-            if (!next.HasValue) break;
+            if (!next.HasValue) break;  //falls back to whatever length it manages if boxed in early
 
             direction = next.Value - head;
             body.Add(next.Value);
@@ -150,10 +132,7 @@ public class ParkingJamBaseZone : BaseZone
         int groupRange = Mathf.Max(1, GameState.Instance.GroupCount);
         return new CarSpec { body = body, escapeLane = lane, direction = direction, group = Random.Range(0, groupRange) };
     }
-
-    // Prefers turning (or not) per turnChance, tries the other perpendicular next, then straight
-    // ahead as a last resort - self-avoiding against every cell already claimed this generation
-    // pass (other pieces' bodies) and this piece's own body so far.
+    
     static Vector2Int? StepBody(Vector2Int from, Vector2Int direction, float turnChance, RectInt bounds, HashSet<Vector2Int> occupied, List<Vector2Int> body)
     {
         //builds direction priority list instead of naively shuffling
@@ -187,17 +166,9 @@ public class ParkingJamBaseZone : BaseZone
         return null;
     }
 
-    // Continues straight past the body's head in whatever direction the body's own last segment
-    // was already heading - these cells (never the body's own) are what must be clear of every
-    // other still-present piece for this one to escape. The direction has to stay exactly what
-    // the piece's own shape visibly implies (the last segment's heading is the only escape-facing
-    // cue a player can actually see) - a lane that bent on its own past that, invisibly, would let
-    // pieces get blocked or escape for reasons nothing on screen explains.
-    //
-    // Also stops if it would re-enter the piece's own body - a sharply-spiraled shape could
-    // otherwise have its straight exit line clip back through its own tail, which would make the
-    // solver correctly (if confusingly) treat it as permanently self-blocked; better to just cut
-    // the lane short there, same as hitting the boundary.
+    //continues straight past the body's head in whatever direction the body's own last segment
+    //was already heading, these cells (never the body's own) are what must be clear of every
+    //other still-present piece for this one to escape.
     static List<Vector2Int> BuildEscapeLane(List<Vector2Int> body, Vector2Int direction, RectInt bounds)
     {
         var lane = new List<Vector2Int>();
@@ -218,11 +189,8 @@ public class ParkingJamBaseZone : BaseZone
         return clockwise ? new Vector2Int(direction.y, -direction.x) : new Vector2Int(-direction.y, direction.x);
     }
 
-    // Monotone solvability check: repeatedly find any remaining piece whose lane is currently
-    // entirely free of every other remaining piece's body, remove it, repeat. Correct because
-    // nothing ever repositions to block a piece - a lane that's clear now stays clear (or becomes
-    // clear as other pieces are removed) regardless of removal order, so a single greedy pass (no
-    // backtracking, no joint-state search) is sufficient.
+    //repeatedly find any remaining piece whose lane is currently
+    //entirely free of every other remaining piece's body, remove it, repeat
     static bool IsSolvable(List<CarSpec> cars)
     {
         var remaining = new List<CarSpec>(cars);

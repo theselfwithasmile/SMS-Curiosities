@@ -88,8 +88,7 @@ public class Container
         Color = color;
         Bounds = bounds;
     }
-
-    //first cell not currently occupied
+    
     public Vector2Int NextAvailableCell()
     {
         foreach (Vector2Int cell in OrderedCells)
@@ -109,9 +108,7 @@ public class Container
         }
         return true;
     }
-
-    // Whether this specific cell (one of the container's own) is free to accept a token - the
-    // arbitrary-slot counterpart to CanAccept's "is there room somewhere" check.
+    
     public bool CanAcceptAt(Token token, Vector2Int cell)
     {
         return Cells.Contains(cell) && !occupantByCell.ContainsKey(cell) && CanAccept(token);
@@ -191,9 +188,8 @@ public class Container
         foreach (Vector2Int cell in clearedCells) RevealAt(cell);
     }
 
-    // Strips a token from this container's bookkeeping without the CanRemove exit-constraint gate
-    // - used only to clean up stale cross-membership entries (a token overlapping multiple
-    // containers via a shared cell), never for an ordinary player-initiated removal.
+    //used only to clean up stale cross-membership entries
+    //(a token overlapping multiple containers via a shared cell)
     public void ForceRemoveMember(Token token)
     {
         Members.Remove(token);
@@ -224,9 +220,7 @@ public class Container
         Vector2Int? cell = CellOf(token);
         if (cell.HasValue) occupantByCell.Remove(cell.Value);
     }
-
-    // Buries `token` under `cell` - revealed later, in the order buried, once that specific cell
-    // is vacated (RevealAt).
+    
     public void BuryAt(Vector2Int cell, Token token)
     {
         if (!buriedByCell.TryGetValue(cell, out Queue<Token> queue))
@@ -237,8 +231,7 @@ public class Container
         queue.Enqueue(token);
     }
 
-    // Promotes the next token buried under this specific cell, if any, once the cell is actually
-    // vacated - a no-op for cells with nothing buried, so ordinary containers pay nothing.
+    //promotes the next token buried under this specific cell
     public void RevealAt(Vector2Int cell)
     {
         if (occupantByCell.ContainsKey(cell)) return;
@@ -250,11 +243,8 @@ public class Container
         TweenRunner.Instance.GrowIn(next.transform);
         ForceAcceptAt(next, cell);
 
-        // Bypassing entry constraints is correct here (the token was already "inside" the
-        // container, just hidden - this isn't a new player-initiated entry), but the completion
-        // check itself must still run: a reveal can be exactly what completes the container (e.g.
-        // it was already full-minus-one and this fills the last cell with a matching group), and
-        // that shouldn't have to wait for an unrelated future placement to notice.
+        //bypassing entry constraints but the completion check itself must still run
+        //when a reveal can be exactly what completes the container
         if (CompletionPredicate != null && CompletionPredicate.IsComplete(this))
         {
             Resolution?.Resolve(this);

@@ -1,10 +1,6 @@
 using UnityEngine;
 
-// Minimal, unstyled state -> panel-visibility wiring for the four flow screens. Assign the panel
-// GameObjects in the Inspector and hook each button's OnClick to the matching On*Clicked method -
-// no layout, styling, or transitions here on purpose; this only has to prove the flow works end to
-// end (Menu -> Playing -> Paused -> Playing, Won/Lost -> Retry/Next Level) so the actual screens
-// can be built on top.
+
 public class GameFlowUI : MonoBehaviour
 {
     [SerializeField] GameObject menuPanel;
@@ -23,9 +19,8 @@ public class GameFlowUI : MonoBehaviour
         if (GameFlowManager.Instance != null) GameFlowManager.Instance.OnStateChanged -= Refresh;
     }
 
-    // Covers the very first frame this object exists, before the manager's own sceneLoaded
-    // subscription (see GameFlowManager.Awake) has had a chance to broadcast anything - every
-    // transition after that, including reload-based ones, comes through OnStateChanged instead.
+    //covers the very first frame this object exists, before the manager's own sceneLoaded
+    //subscription has had a chance to broadcast anything
     void Start() => Refresh(GameFlowManager.Instance != null ? GameFlowManager.Instance.State : FlowState.Menu);
 
     void Refresh(FlowState state)

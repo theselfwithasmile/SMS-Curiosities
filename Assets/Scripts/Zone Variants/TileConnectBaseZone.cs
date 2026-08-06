@@ -2,19 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Variants;
 
-// Tile Connect (Onet-style, simplified): every tile-field cell is a single-cell container that
-// only ever loses its token via PathConnectInteraction, never gains one via ordinary drag
-// (NoEntryConstraint) - tokens are seeded once at generation, bypassing TryAccept directly.
-//
-// Generated backward ("reverse search", per the puzzle-generation research this project has been
-// chasing): start empty, repeatedly pick an unpaired cell and a same-region partner reachable
-// from it (given everything already placed), assign them a matching group, mark both reserved,
-// repeat. This guarantees solvability - clearing pairs in the exact reverse of generation order
-// recreates, at each step, precisely the occupancy that pair was originally verified against.
-//
-// The tile field is inset from the grid's own bounds, leaving an outer margin with no containers
-// at all - that margin is the shared "outside" corridor connecting all four edges, without which
-// edge tiles would have nowhere to route through at all.
+//every tile-field cell is a single-cell container that only ever loses its token
+//via PathConnectInteraction, never gains one via ordinary drag
 public class TileConnectBaseZone : BaseZone
 {
     [SerializeField] int margin = 1;
@@ -28,10 +17,8 @@ public class TileConnectBaseZone : BaseZone
         var fieldBounds = new RectInt(margin, margin, boardSize - margin * 2, boardSize - margin * 2);
         List<Container> cells = new PerTileLayout().Build(fieldBounds, GameState.Instance.BubbleColor);
 
-        // A perfect pairing needs an even cell count - an odd boardSize (odd^2 = odd) can never be
-        // fully paired off, so IsSolvable() would fail every single attempt, every time. Dropping
-        // one cell up front keeps the count even and pairing achievable regardless of boardSize's
-        // parity.
+        //dropping one cell up front keeps the count even and pairing achievable regardless of boardSize's
+        //parity to ensure solvability
         if (cells.Count % 2 != 0)
         {
             Container extra = cells[cells.Count - 1];
@@ -53,12 +40,8 @@ public class TileConnectBaseZone : BaseZone
         var reserved = new HashSet<Vector2Int>();  //tracks cells already paired
         var order = new List<Vector2Int>(cellLookup.Keys);
         ContainerManager.Shuffle(order);
-
-        // One color per PAIR, drawn from the shared palette rather than a unique id per pair -
-        // lets a player match any two reachable same-colored tiles, not just the one specific
-        // partner generation happened to assign (PathConnectInteraction re-checks reachability
-        // live at match time regardless, so this only ever adds valid moves, never removes the
-        // guaranteed reverse-generation clearing order).
+        
+        //match any two reachable same-colored tiles
         int pairCount = cellLookup.Count / 2;
         List<int> colors = ContainerManager.BuildQuotaMatchedGroups(pairCount, groupCount, 1);
         ContainerManager.Shuffle(colors);
@@ -81,11 +64,7 @@ public class TileConnectBaseZone : BaseZone
 
         return true;
     }
-
-    // A board is only fully clearable if every cell has a partner - an unpaired leftover can never
-    // be cleared (PathConnectInteraction always needs two), so unlike the old "rare acceptable
-    // leftover" behaviour, that's a real solvability failure worth retrying with a fresh pairing
-    // order rather than silently accepting.
+    
     protected override bool IsSolvable() => pendingPairs.Count * 2 == cellLookup.Count;
 
     protected override void CommitLayout()

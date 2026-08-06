@@ -2,9 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Tile Connect's "these two are legally paired" cue: briefly draws a line along the route
-// PathConnectInteraction already verified, so a match reads as "connected, then cleared"
-// instead of "two tiles vanished for reasons only the rules know."
+//briefly draws a line along the route
+//PathConnectInteraction already verified, so a match reads as "connected, then cleared"
+//instead of "two tiles vanished for reasons only the rules know."
 public static class ConnectPathEffect
 {
     public static void ShowThenDestroy(List<Vector2Int> pathCells, Color color, Token a, Token b, float holdDuration = 0.18f)
@@ -37,9 +37,23 @@ public static class ConnectPathEffect
         renderer.startWidth = width;
         renderer.endWidth = width;
         renderer.numCapVertices = 4;
-        renderer.material = GridRenderer.BuildMaterial(color);
+        renderer.material = BuildMaterial(color);
         renderer.sortingOrder = 100;
 
         return line;
+    }
+    
+    public static Material BuildMaterial(Color color)
+    {
+        var shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            Debug.LogError("Grid: could not find shader 'Universal Render Pipeline/Unlit'.");
+        }
+        var material = new Material(shader);
+        material.color = color;
+        material.enableInstancing = true;
+        material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+        return material;
     }
 }

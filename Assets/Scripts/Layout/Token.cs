@@ -4,69 +4,25 @@ using UnityEngine.Animations;
 using UnityEngine.EventSystems;
 using UnityEngine.Playables;
 
-// Token absorbs what used to be a separate Draggable component - every token that exists is
-// draggable, and the only remaining per-variant differences (CellOffsets, EscapeLane) are plain
-// data rather than a pluggable strategy object, so there was never a real reason to keep the drag
-// verb as a component of its own.
 [RequireComponent(typeof(Collider2D))]
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
     public Container CurrentContainer;
     
     public int Group;
-    public int Tier; // merge level only (2048-style) - never used for group/type matching
-
-    // Relative footprint in cells. Size 1 (the default) behaves exactly like a normal single-cell
-    // token; a multi-cell piece (Block Puzzle, Parking Jam) just has more entries here - any
-    // extra visuals for those cells are child sprites baked into the prefab, which move for free
-    // since they're parented under this Transform.
+    public int Tier;
     public List<Vector2Int> CellOffsets = new List<Vector2Int> { Vector2Int.zero };
-
-    // Arrow/Parking Jam: true means drag-end resolves via ResolveEscapeDrag (fully escape or
-    // fully revert) instead of ordinary container placement. Deliberately a plain bool rather than
-    // gating on "EscapeLane != null" - Unity's serializer can't represent null for a List<T> field
-    // on a prefab-instantiated object, so an untouched EscapeLane silently comes back as an empty
-    // list rather than null, making a null-check unusable as a marker here.
+    
     public bool IsEscapePiece;
-
-    // The fixed corridor (absolute cells, beyond the body) leading from this token's head to the
-    // grid boundary, baked in at spawn - only meaningful when IsEscapePiece is true. The piece's
-    // own body never partially moves, so all that matters is whether every lane cell is currently
-    // free of every other still-present piece.
     public List<Vector2Int> EscapeLane;
-
-    // The direction EscapeLane runs in - needed to check that a drag actually aimed the piece
-    // toward its own exit before consulting the lane at all (a lane that happens to be clear
-    // shouldn't let ANY drag, in any direction or distance, trigger an escape).
     public Vector2Int EscapeDirection;
+    public System.Action OnEscaped; // Fired right as this piece clears its lane and leaves the board
+    
+    public bool CanExitBoard; //true once a zone considers this token "finished"
 
-    // The absolute grid cell CellOffsets is anchored to, baked in at spawn (ParkingJamBaseZone
-    // already knows it exactly - see CommitLayout). ResolveEscapeDrag uses this directly instead
-    // of re-deriving it from originalPosition via Grid.WorldToCell, since Grid recomputes its
-    // cellSize/origin from the camera every frame (Grid.Update) - any drift there (e.g. the Game
-    // view being resized mid-session) would make that re-derived cell disagree with the piece's
-    // true committed body, clearing the wrong cells on escape and leaving a still-present car's
-    // body wrongly marked free for whatever piece checks that lane next.
-    public Vector2Int AnchorCell;
-
-    // The extra per-cell sprites SpawnMultiCellToken creates for a multi-cell token (Block
-    // Puzzle, Parking Jam), in the same order as CellOffsets[1..] (head-to-tail - index 0, the
-    // head, is this Token's own SpriteRenderer, not a separate child). Empty for an ordinary
-    // single-cell token. Used by TweenRunner.CascadeShrinkAndDestroy to shrink a car's body out
-    // tail-first instead of vanishing as one block.
-    public List<Transform> CellParts = new List<Transform>();
-
-    // Fired right as this piece clears its lane and leaves the board - ParkingJamBaseZone uses it
-    // to track how many cars are still in play for its win check, without Token needing to know
-    // anything about zones or win conditions itself.
-    public System.Action OnEscaped;
-
-    // Generic (lane-free) counterpart to IsEscapePiece: true once a zone considers this token
-    // "finished" (e.g. Merge's target-tier result) - dropping it anywhere off the board (outside
-    // every container, not just a specific baked corridor) destroys it instead of reverting. Lets
-    // a zone's win condition just be "every container empty" (BaseZone's generic default) rather
-    // than needing its own bespoke completion check.
-    public bool CanExitBoard;
+    
+    public Vector2Int AnchorCell;  //absolute grid cell CellOffsets is anchored to
+    public List<Transform> CellParts = new List<Transform>(); //the extra per-cell sprites SpawnMultiCellToken creates for a multi-cell token
 
     Vector3 pointerOffset;
     Vector3 originalPosition;
@@ -74,11 +30,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     float zDistance;
     bool dragAllowed;
     Coroutine activeMoveTween;
-
-    // The AnimationClips TokenSpawner assigns are ordinary (non-legacy) clips authored in the
-    // Animation window, not legacy clips - the old Animation component can't play those at all,
-    // so playback goes through the Playables API instead: an Animator purely as a bind target
-    // (no Controller needed) plus a single AnimationClipPlayable we drive by hand.
+    
     Animator animator;
     PlayableGraph playableGraph;
     AnimationClipPlayable clipPlayable;
@@ -86,25 +38,18 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     bool isHovered;
     bool isDragging;
     bool isAnimating;
-
-    // True once an emoji AnimationClip has been assigned - lets callers (TokenSpawner's flat
-    // color tint) skip work that would otherwise fight the emoji art's own colors.
     public bool HasAnimation => currentClip != null;
 
     void Awake()
     {
         GetComponent<SpriteRenderer>().color = GameState.Instance.SecondaryGroupColor(Group);
     }
-
-    // The graph is driven entirely by hand (never PlayableGraph.Play()) - deliberately, so this
-    // Evaluate call is the only thing advancing it and there's no risk of Unity's own per-frame
-    // auto-evaluation double-advancing time on top of it. Playables don't loop clips on their
-    // own either, so wrapping past clip length is manual too. Guarded by isAnimating so idle
-    // (the common case: not hovered, not dragged) tokens pay nothing here.
+    
     void Update()
     {
         if (!isAnimating || currentClip == null || currentClip.length <= 0f) return;
 
+        //the graph is driven entirely by hand 
         playableGraph.Evaluate(Time.deltaTime);
         if (clipPlayable.GetTime() >= currentClip.length)
         {
@@ -116,10 +61,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     {
         if (playableGraph.IsValid()) playableGraph.Destroy();
     }
-
-    // Assigns the sprite flipbook for this token's current Group/Tier (TokenSpawner resolves
-    // which clip that is). Tokens sit on a static resting frame otherwise - the clip only plays
-    // while hovered or dragged, via OnPointerEnter/Exit and the drag handlers below.
+    
     public void SetAnimationClip(AnimationClip clip)
     {
         if (clip == null) return;
@@ -127,17 +69,14 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (playableGraph.IsValid()) playableGraph.Destroy();
         currentClip = clip;
 
-        // Prefer an Animator already on the prefab - one added here via AddComponent isn't
-        // reliably ready to accept a Playables binding in the same frame it's created, so the
-        // very first Evaluate (the one that shows the resting frame) can silently no-op.
+        //prefer an Animator already on the prefab
         if (animator == null) animator = GetComponent<Animator>();
         if (animator == null) animator = gameObject.AddComponent<Animator>();
         playableGraph = PlayableGraph.Create($"{name}Animation");
         AnimationPlayableOutput output = AnimationPlayableOutput.Create(playableGraph, "Output", animator);
         clipPlayable = AnimationClipPlayable.Create(playableGraph, clip);
         output.SetSourcePlayable(clipPlayable);
-
-        // Emoji art carries its own color - stop tinting it with the group's flat placeholder.
+        
         GetComponent<SpriteRenderer>().color = Color.white;
 
         StopAnimationAndReset();
@@ -171,30 +110,18 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (!isDragging) StopAnimationAndReset();
     }
     
-
-    // How much a buried token's color is darkened by, relative to its normal (revealed) color -
-    // a visible-but-dim cue that something is stacked underneath, rather than hiding it outright.
+    
     const float BuriedColorFactor = 0.45f;
-
-    // Buried tokens spawn dead-center under their occupant (same cell, same anchor position), so
-    // without an offset they'd sit perfectly behind an identically-sized sprite and the dimming
-    // above would never actually be visible. Nudging toward one corner by a fraction of a cell
-    // lets that corner peek out from behind the occupant instead.
-    const float BuriedPeekFraction = 0.22f;
+    const float BuriedPeekFraction = 0.08f;
     static readonly Vector2 BuriedPeekDirection = new Vector2(1f, -1f).normalized;
 
     Color revealedColor;
     int revealedSortingOrder;
     bool isBuried;
-
-    // Layering: a buried token starts dimmed, peeking from one corner, and non-interactive
-    // (SetRevealed(false) right after spawn, once its real color/sortingOrder are already
-    // assigned) until whatever's above it in the same cell is vacated, at which point
-    // Container.RevealAt calls this again with true to restore it - the SpriteRenderer itself
-    // stays enabled either way, since staying visible (if dim) is the whole point.
+    
     public void SetRevealed(bool revealed)
     {
-        if (revealed != isBuried) return; // already in the requested state - avoid re-applying the offset
+        if (revealed != isBuried) return;
 
         SpriteRenderer renderer = GetComponent<SpriteRenderer>();
         if (revealed)
@@ -220,8 +147,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         GetComponent<Collider2D>().enabled = revealed;
     }
 
-    // Cancels any in-flight drop/revert tween before repositioning - otherwise a fast re-grab
-    // mid-tween leaves both it and the drag itself writing transform.position the same frame.
+    //cancels any in-flight drop/revert tween before repositioning 
     void MoveToSlot(Vector3 destination)
     {
         if (activeMoveTween != null) TweenRunner.Instance.StopCoroutine(activeMoveTween);
@@ -230,10 +156,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        // Once a zone has reported an outcome (or before Playing even starts, e.g. still on the
-        // menu) the board underneath a Won/Lost/Menu panel must stop responding on its own -
-        // relying on the panel to visually cover it isn't enough, since UI raycast blocking is a
-        // scene/graphic-raycaster setup detail, not something this script controls.
         if (GameFlowManager.Instance != null && GameFlowManager.Instance.State != FlowState.Playing)
         {
             dragAllowed = false;
@@ -249,8 +171,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         originalPosition = transform.position;
         originalContainer = CurrentContainer;
 
-        // Leaving a container is its own legality check (e.g. Screw's blocked-by-neighbors
-        // check) - separate from whether the drop target will accept the token.
+        //leaving a container is its own legality check
         dragAllowed = originalContainer == null || originalContainer.TryRemove(this);
         if (!dragAllowed) return;
 
@@ -282,20 +203,14 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             return;
         }
 
-        // A multi-cell footprint (Block Puzzle) places at exactly the drop anchor rather than
-        // the stacking behaviour single-cell tokens normally use.
+        //a multi-cell footprint places at exactly the drop anchor rather than
         if (CellOffsets.Count > 1)
         {
             TryPlaceFootprint();
             return;
         }
 
-        // Actually off the grid+bench footprint (not just the clamped edge cell WorldToCell would
-        // otherwise report) and this token is flagged as done - self-destruct instead of falling
-        // through to the revert branch below. Checked against the raw drop position rather than
-        // candidates.Count == 0, since WorldToCell clamps every drop onto a real in-bounds cell -
-        // dragging arbitrarily far past the board's edge would otherwise still resolve to an
-        // occupied/unoccupied edge container and never read as "outside everything".
+        //actually off the grid+bench footprint
         if (CanExitBoard && !Grid.Instance.IsWorldPositionOnBoard(transform.position))
         {
             NotifyOriginVacated();
@@ -307,9 +222,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         Vector2Int cell = Grid.Instance.WorldToCell(transform.position);
         IReadOnlyList<Container> candidates = ContainerManager.Instance.GetContainersAt(cell);
 
-        // A single occupied slot gets a shot at an occupant interaction (Merge's combine,
-        // Toon Blast's swap) before falling back to "rejected" - fully handled by the
-        // interaction itself (which may destroy/reposition tokens on its own), so just return.
+        //a single occupied slot gets a shot at an occupant interaction before falling back to "rejected"
         if (candidates.Count == 1 && !candidates[0].CanAccept(this) && candidates[0].TryInteractWithOccupant(this, originalContainer))
         {
             return;
@@ -327,30 +240,20 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
     }
 
-    // Confirms the origin slot is permanently vacated (as opposed to the drag reverting back into
-    // it) - only now is it safe to reveal whatever was buried underneath, since a revert would
-    // otherwise collide the returning token with a freshly revealed one in the same cell.
+    //confirms the origin slot is permanently vacated
     void NotifyOriginVacated()
     {
         if (originalContainer == null) return;
         originalContainer.RevealAt(Grid.Instance.WorldToCell(originalPosition));
     }
 
-    // The body never partially moves - it either escapes whole or reverts whole. Since the lane is
-    // baked in at spawn as exactly the cells beyond the head that need to be clear, checking
-    // escape is just "is every one of those currently free of other still-present pieces" - no
-    // slide simulation needed at all.
+    //the body either escapes whole or reverts whole
     void ResolveEscapeDrag()
     {
-        // Continuous world-space movement, not grid-cell movement - a cell can easily span a
-        // large chunk of the screen, so requiring the drop to have crossed into a whole different
-        // cell before even registering direction would make ordinary drags never trigger at all.
         Vector2 worldDelta = (Vector2)transform.position - (Vector2)originalPosition;
         Vector2 escapeDirWorld = new Vector2(EscapeDirection.x, EscapeDirection.y);
 
-        // Only actually attempt the exit if the drag aimed this piece toward its own escape
-        // direction - dropping it anywhere else (or barely moving it at all) should just snap
-        // back, not silently trigger an escape check the drag itself never aimed at.
+        //only actually attempt the exit if the drag aimed this piece toward its own escape direction
         bool draggedTowardExit = Vector2.Dot(worldDelta, escapeDirWorld) > 0f;
         if (!draggedTowardExit)
         {
@@ -381,10 +284,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             Grid.Instance.SetOccupied(anchor + offset, occupied);
         }
     }
-
-    // Places the token into the exact cell dropped on, across every container that owns that
-    // cell (a shared cell like Block Puzzle's row/column pair) - arbitrary-slot placement rather
-    // than always compacting into a multi-cell container's next open slot in claim order.
+    
     bool TryEnterAll(IReadOnlyList<Container> containers, Vector2Int dropCell)
     {
         for (int i = 0; i < containers.Count; i++)
@@ -398,12 +298,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         }
         return true;
     }
-
-    // Block Puzzle-style placement: every offset cell (anchored at the drop cell) must belong to
-    // at least one container, and all of them must have room, checked as one atomic footprint
-    // rather than cell by cell. On success, TryClaimFootprint decomposes this piece into
-    // independent single-cell tokens (already positioned) and destroys this GameObject as part of
-    // that - nothing left to do here, and touching `this` afterward would be a destroyed reference.
+    
     void TryPlaceFootprint()
     {
         Vector2Int anchor = Grid.Instance.WorldToCell(transform.position);

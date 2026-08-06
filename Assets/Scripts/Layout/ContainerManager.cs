@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Container/token generation, lookup, and rendering. Depends on Grid for coordinate conversion
-// and bounds, and keeps Grid's occupancy set in sync so its dotted-cell rendering stays correct.
 public class ContainerManager : MonoBehaviour
 {
     public static ContainerManager Instance;
@@ -101,9 +99,7 @@ public class ContainerManager : MonoBehaviour
         }
     }
 
-    // Picks a rect of the given capacity (a straight line along axisBias if one's given, otherwise
-    // the closest-to-square factor pair) and places it at a random free position on the board -
-    // the generated-container counterpart to CreateFixedContainer's caller-supplied rect.
+    //places at a random free position on the board
     public Container GenerateContainer(int capacity, Color color, Vector2Int axisBias = default)
     {
         Vector2Int size = RectSizeFor(capacity, axisBias);
@@ -137,8 +133,8 @@ public class ContainerManager : MonoBehaviour
         return null;
     }
 
-    // No bias: closest-to-square factor pair of capacity. Biased: a 1-wide line running along the
-    // bias axis (capacity cells long) - e.g. Water Sort's vertical tubes.
+    //no bias: closest-to-square factor pair of capacity.
+    //with bias: a 1-wide line running along the bias axis
     static Vector2Int RectSizeFor(int capacity, Vector2Int axisBias)
     {
         if (axisBias.y != 0) return new Vector2Int(1, capacity);
@@ -179,24 +175,14 @@ public class ContainerManager : MonoBehaviour
         return container;
     }
 
-    // Sizes/positions the prefab's 9-sliced sprite to exactly cover the container's rect, and
-    // tints it to the container's colour the same way Token tints its own sprite per-group.
+    //sizes/positions the prefab's 9-sliced sprite to exactly cover the container's rect
     SpriteRenderer CreateVisual(Container container)
     {
         SpriteRenderer visual = Instantiate(containerPrefab, transform);
         visual.color = container.Color;
         visual.drawMode = SpriteDrawMode.Sliced;
-        // Tokens sit at the prefab's default sortingOrder (0) - draw containers behind them
-        // deterministically rather than relying on transparent-queue instantiation order, which
-        // isn't guaranteed for sprites sharing the same Z.
         visual.sortingOrder = -1;
-        // `size` below is a local-space measurement that gets multiplied by whatever scale the
-        // prefab happens to carry (the same authored-scale convention Token.prefab uses to blow
-        // its own small native sprite up to world size) - neutralize it so `size` alone controls
-        // world-space dimensions, otherwise the rect comes out scaled by whatever the prefab's
-        // transform was left at in the editor.
-        visual.transform.localScale = Vector3.one;
-
+        visual.transform.localScale = Vector3.one;  //independent of localSpace
         Vector3 min = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMin, container.Bounds.yMin));
         Vector3 max = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMax - 1, container.Bounds.yMax - 1));
         visual.transform.position = (min + max) * 0.5f;

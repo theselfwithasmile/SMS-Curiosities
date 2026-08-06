@@ -29,32 +29,19 @@ public class TokenSpawner : MonoBehaviour
         ApplyAnimation(token, byTier);
         return token;
     }
-
-    // The prefab's baked scale is authored to fill one cell at Grid.ReferenceCellSize - rescale
-    // by how today's actual CellSize compares to that reference so a denser board (smaller cells)
-    // doesn't leave the token's emoji overflowing its container.
+    
     static void ScaleToCell(Transform tokenTransform)
     {
         tokenTransform.localScale *= Grid.Instance.CellSize / Grid.Instance.ReferenceCellSize;
     }
-
-    // Every zone spawns a token and immediately applies its group color the same way - this was
-    // duplicated line-for-line in all five. Skipped once emoji art is wired up for the group
-    // (HasAnimation) - tinting emoji art with the flat placeholder color would just fight its own
-    // colors.
+    
     public Token SpawnColoredToken(int group, Vector3 worldPosition, bool byTier = false)
     {
         Token token = SpawnToken(group, worldPosition, byTier);
         if (!token.HasAnimation) token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
         return token;
     }
-
-    // Resolves this token's Group to an AnimationClip. Most zones don't care which entry in the
-    // group's list a token shows - Tier only means something to Merge (2048-style), so everyone
-    // else gets an arbitrary entry instead of always the first. Merge passes byTier so its clip
-    // stays pinned to the actual merge level (clips indexed by tier within the group) - called
-    // again by anything that changes a token's Tier after the fact (a merge result), since the
-    // clip needs to track whichever tier the token is actually showing.
+    
     public void ApplyAnimation(Token token, bool byTier = false)
     {
         if (animations == null || token.Group < 0 || token.Group >= animations.Count) return;
@@ -62,13 +49,12 @@ public class TokenSpawner : MonoBehaviour
         List<AnimationClip> clips = animations[token.Group].clips;
         if (clips == null || clips.Count == 0) return;
 
+        //arbitrary entry if tier level does not matter
         int index = byTier ? Mathf.Clamp(token.Tier, 0, clips.Count - 1) : Random.Range(0, clips.Count);
         token.SetAnimationClip(clips[index]);
     }
-
-    // Parking Jam: the escape piece's own resting sprite is the direction cue - overrides
-    // whatever ApplyAnimation picked from the per-group list with one of the four direction
-    // clips instead. Replaces the old separate triangle-arrow overlay entirely.
+    
+    //for parking jam direction rendering
     public void ApplyDirectionAnimation(Token token, Vector2Int direction)
     {
         if (directionAnimations?.clips == null) return;
@@ -78,8 +64,7 @@ public class TokenSpawner : MonoBehaviour
 
         token.SetAnimationClip(directionAnimations.clips[index]);
     }
-
-    // Matches the clip authoring order: 0 up, 1 down, 2 left, 3 right.
+    
     static int DirectionIndex(Vector2Int direction)
     {
         if (direction == Vector2Int.up) return 0;
@@ -89,13 +74,7 @@ public class TokenSpawner : MonoBehaviour
         return -1;
     }
 
-        // Multi-cell pieces (Block Puzzle, Parking Jam) are still one Token with a longer
-    // CellOffsets list - the extra cells just need a visual, so this bolts on a plain child
-    // sprite per extra offset (reusing the base token's sprite/color), parented with
-    // worldPositionStays so it lands correctly regardless of the prefab's own nested scale.
-    // Uses SpawnColoredToken (not the raw SpawnToken) specifically so the base sprite already has
-    // its correct color before children copy it - spawning uncolored here would let children copy
-    // Token.Awake()'s stale Group-0 color, since .Group isn't assigned until after Instantiate.
+    //multi-cell pieces are one Token with a longer CellOffsets list
     public Token SpawnMultiCellToken(int group, Vector3 anchorWorldPosition, List<Vector2Int> offsets)
     {
         Token token = SpawnColoredToken(group, anchorWorldPosition);
@@ -108,11 +87,7 @@ public class TokenSpawner : MonoBehaviour
             child.transform.position = anchorWorldPosition + (Vector3)((Vector2)offsets[i] * Grid.Instance.CellSize);
             child.transform.SetParent(token.transform, true);
 
-            // worldPositionStays above preserves this object's pre-parent world SCALE too (its
-            // freshly-created default of 1,1,1) - a third the root's actual on-screen size, since
-            // the Token prefab's root carries localScale 3,3,1 to blow its small native sprite up
-            // to cell size (see ContainerManager.CreateVisual for the same convention). Resetting
-            // to 1,1,1 here means "match the root", not "keep this object's old world scale".
+            //resetting to 1,1,1 here means "match the root", not "keep this object's old world scale"
             child.transform.localScale = Vector3.one;
 
             var renderer = child.AddComponent<SpriteRenderer>();
@@ -125,18 +100,9 @@ public class TokenSpawner : MonoBehaviour
         return token;
     }
 
-    // Checks every offset cell (anchored at a given cell) against all of its owning containers
-    // atomically - tracking pending claims per container so two offset cells landing in the same
-    // container can't both pass a stale capacity check - then commits. Used by Token's multi-cell
-    // drop (Block Puzzle pieces).
-    //
-    // Commits by decomposing into one independent single-cell token per offset, rather than
-    // sharing the original multi-cell token across every owning container. Block Puzzle's row and
-    // column containers clear independently of each other - a rigid multi-cell piece straddling a
-    // completed row and an untouched column would otherwise get destroyed in its entirety just
-    // because ONE of its cells sat in the completed row. Once decomposed, each cell only ever
-    // answers to its own row/column, exactly like a real placed block. The original token is
-    // destroyed as part of this - callers must not touch it afterward on a true return.
+    //checks every offset cell against all of its owning containers
+    //atomically via tracking pending claims per container so two offset cells landing in the same
+    //container can't both pass a stale capacity check
     public bool TryClaimFootprint(Token token, Vector2Int anchor, List<Vector2Int> offsets)
     {
         var pendingCounts = new Dictionary<Container, int>();  //tracks pending claims for container
@@ -164,6 +130,7 @@ public class TokenSpawner : MonoBehaviour
         int group = token.Group;
         Destroy(token.gameObject);
 
+        //commits footprint
         foreach (Vector2Int offset in offsets)
         {
             Vector2Int cell = anchor + offset;

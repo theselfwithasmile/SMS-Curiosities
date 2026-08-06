@@ -1,9 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-// Sells "combined into" rather than "replaced by": both source tokens converge on the target
-// cell and shrink together, then the higher-tier result pops in - instead of the previous
-// instant destroy-both/spawn-new swap.
 public static class MergeEffect
 {
     public static void Play(Token incoming, Token occupant, Container container, Vector2Int cell, int group, int nextTier, bool isFinalTier)

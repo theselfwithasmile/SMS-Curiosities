@@ -19,12 +19,7 @@ public class FullPredicate : ICompletionPredicate
     public bool IsComplete(Container container) => container.Members.Count >= container.Capacity;
 }
 
-// Completes only when the container is full AND every member shares the same group. Needed
-// wherever a container can end up full-but-mixed without going through the normal entry-gated
-// path - e.g. Water Sort's buried-token reveal deliberately bypasses GroupMatchConstraint (a
-// buried token isn't a new player move, so nothing there guarantees it matches its tube), so
-// plain FullPredicate can't tell a genuinely solved tube apart from one that just happens to be
-// full.
+//completes only when the container is full and every member shares the same group
 public class FullAndSameGroupPredicate : ICompletionPredicate
 {
     public bool IsComplete(Container container)
@@ -88,11 +83,8 @@ public class SpawnTokenResolution : IResolution
 
 public class MergeInteraction : IOccupantInteraction
 {
-    // The tier at which a merge result becomes the zone's final tile - passed through to
-    // MergeEffect so it can flag the spawned token as exitable (Token.CanExitBoard), rather than
-    // this zone needing its own per-cell completion predicate/resolution to notice a tier was
-    // reached (MergeBaseZone's win check is now the same generic "board fully cleared" every
-    // other zone uses, satisfied once every final tile has been dragged off).
+    //the tier at which a merge result becomes the zone's final tile
+    //to be passed through to MergeEffect so it can flag the spawned token as exitable
     readonly int targetTier;
 
     public MergeInteraction(int targetTier)
@@ -115,10 +107,8 @@ public class MergeInteraction : IOccupantInteraction
 }
 
 //dropping onto a different-group occupant swaps the two
-// tokens instead of being rejected, then flood-fills same-group neighbors from both affected
-// cells and clears any run of minMatchSize+ into one grouped output token.
-// Matching is checked once, after the swap lands, against the drop cell's real grid neighbors -
-// not previewed mid-drag - so the swap has to land grid-adjacent to a cluster to connect it.
+//tokens instead of being rejected, then flood-fills same-group neighbors from both affected
+//cells and clears any run of minMatchSize+ into one grouped output token.
 public class SwapInteraction : IOccupantInteraction
 {
     readonly Container outputDestination;
@@ -130,6 +120,8 @@ public class SwapInteraction : IOccupantInteraction
         this.minMatchSize = minMatchSize;
     }
 
+    //matching is checked once, after the swap lands, against the drop cell's real grid neighbors
+    //instead of being previewed mid-drag, so the swap has to land grid-adjacent to a cluster to connect it.
     public bool TryInteract(Token incoming, Container incomingOrigin, Token occupant, Container container)
     {
         if (incomingOrigin == null || incomingOrigin == container) return false;
@@ -260,9 +252,7 @@ public class PathConnectInteraction : IOccupantInteraction
     }
 }
 
-// Runs an inner resolution then an extra callback - lets a zone piggyback tracking (e.g. Block
-// Puzzle's clear-count win quota) onto a shared resolution like ClearResolution without needing a
-// bespoke IResolution of its own just to add one counter increment.
+//runs an inner resolution then an extra callback to let a zone piggyback tracking onto existing resolutions
 public class CompositeResolution : IResolution
 {
     readonly IResolution inner;

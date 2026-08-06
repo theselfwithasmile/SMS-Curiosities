@@ -43,9 +43,7 @@ public class OrthogonalLayout : IContainerLayout
     }
 }
 
-// A single rect-shaped container placed at a random free position (one of Water Sort's
-// tubes/shelves). axisBias (e.g. Vector2Int.up) produces a 1-wide line along that axis (capacity
-// cells long) - no bias produces the closest-to-square rect instead.
+//rect-shaped container placed at a random free position 
 public class RegionGrowthLayout : IContainerLayout
 {
     readonly int capacity;
