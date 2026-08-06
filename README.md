@@ -1,14 +1,13 @@
-# [Project Name — see naming notes]
+# SMS Curiosities
 
-An unified Unity puzzle model, referencing trendsetting puzzle titles in form of cutesy emojis, to be dragged between text bubbles until every thread finally gets untangled and settles down.
+An unified Unity puzzle model, referencing trendsetting mobile titles in form of lovely emojis, to be dragged across text bubbles and destroyed in one way or another
 
 ![Unity](https://img.shields.io/badge/Unity-black?logo=unity)
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
 ![Platform](https://img.shields.io/badge/platform-mobile%20%2F%202D-blue)
 
 <p align="center">
-  <!-- TODO: swap in an actual gameplay gif/screenshot, e.g.: -->
-  <!-- <img src="demo.gif" width="850" alt="Gameplay"> -->
+  <img src="demo.gif" width="200" alt="Gameplay">
 </p>
 
 ---
@@ -28,11 +27,11 @@ The project demonstrates reusable architecture, procedural generation with corre
 
 | Genre | Container / Layout | Constraint | Completion | Generation approach |
 |---|---|---|---|---|
-| Water Sort | Region-grown tubes | Capacity + same-group entry | Tube full (homogeneous) | Quota-matched supply |
+| Water Sort | Region-grown tubes | Capacity + same-group entry | Tube full | Quota-matched supply |
 | Merge (2048-style) | Per-tile cell | Occupant interaction (merge on match) | Target tier reached | Seeded so the target tier is always reachable |
 | Toon Blast (match-3) | Per-tile cell, optional layering | Occupant interaction (swap-to-match) | Board cleared | Quota-matched groups |
 | Tile Connect (Onet-style) | Per-tile cell, no direct entry | Reachability (routed connection) | Board cleared | Reverse construction (build backward from a solved state) |
-| Parking Jam (arrow-maze) | None — pure grid occupancy | Escape-lane clearance | Every piece escaped | Greedy monotone solvability check |
+| Parking Jam (arrow-maze) | None | Escape-lane clearance | Every piece escaped | Greedy monotone solvability check |
 
 
 ---
@@ -79,7 +78,6 @@ Assets/Scripts/
     TileConnectBaseZone.cs
     ParkingJamBaseZone.cs
   Visuals/
-    GridRenderer.cs          # GPU-instanced dot/container rendering
     TweenRunner.cs            # Coroutine-based tween utility
     MergeEffect.cs
     ConnectPathEffect.cs
