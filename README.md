@@ -16,7 +16,7 @@ An unified Unity puzzle model, referencing trendsetting mobile titles in form of
 
 A modular Unity puzzle framework, built to demonstrate that a wide range of commercially-recognizable mobile puzzle genres can be expressed as different configurations of the same small set of systems, rather than implemented one by one as separate minigames.
 
-Seven commercially-recognizable puzzle genres: Water Sort, Block Puzzle, Merge, Toon Blast, Tile Connect, Screw Nuts and Parking Jam currently run on one shared architecture instead of five separate codebases. Each is expressed as a different composition of the same handful of systems (layout, constraints, completion predicates, resolutions), with its own procedural generator and its own way of guaranteeing the result is actually solvable. Currently, five of them have been fully implemented.
+Six commercially-recognizable puzzle genres: Water Sort, Block Puzzle, Merge, Toon Blast, Tile Connect and Parking Jam currently run on one shared architecture instead of five separate codebases. Each is expressed as a different composition of the same handful of systems (layout, constraints, completion predicates, resolutions), with its own procedural generator and its own way of guaranteeing the result is actually solvable. Currently, five of them have been fully implemented.
 
 The project demonstrates reusable architecture, procedural generation with correctness guarantees, and certain compromises/deviations to better fit the original games with the project's unified model.
 
