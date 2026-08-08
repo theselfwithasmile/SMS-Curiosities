@@ -1,6 +1,7 @@
 # SMS Curiosities
 
-An unified Unity puzzle model, referencing trendsetting mobile titles in form of lovely emojis, to be dragged across text bubbles and destroyed in one way or another
+An endless arcade puzzle mobile game, cycling through varying popular mobile puzzle genres under the same unified architecture, in form of
+SMS emojis dragged around text bubbles.
 
 ![Unity](https://img.shields.io/badge/Unity-black?logo=unity)
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
