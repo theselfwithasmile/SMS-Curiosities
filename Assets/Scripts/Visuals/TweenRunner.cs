@@ -36,6 +36,11 @@ public class TweenRunner : MonoBehaviour
     {
         StartCoroutine(ScaleRoutine(target, Vector3.zero, target.localScale, duration, EaseOutCubic));
     }
+    
+    public void ChatPopIn(Transform target, Transform scaleTarget, float duration = 0.15f)
+    {
+        StartCoroutine(ScaleRoutine(target, Vector3.zero, scaleTarget.localScale, duration, EaseOutCubic));
+    }
 
     public void ShrinkAndDestroy(Token token, float duration = 0.15f)
     {

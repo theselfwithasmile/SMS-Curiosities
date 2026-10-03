@@ -18,7 +18,7 @@ public class MergeBaseZone : BaseZone
 
         //reaching a tier requires 2^tier same-group tokens merged in sequence
         playGroups = Mathf.Clamp(groupCount, 1, Mathf.Max(1, cells.Count / 2));
-        int maxAchievableTier = Mathf.Max(1, Mathf.FloorToInt(Mathf.Log(Mathf.Max(2, cells.Count / playGroups), 2f)));
+        int maxAchievableTier = Mathf.Max(1, Mathf.FloorToInt(Mathf.Log(Mathf.Max(2, cells.Count / playGroups), 2f)));  //finds exponent
         effectiveTargetTier = Mathf.Clamp(Scaled(targetTier, spawnGrowthPerLevel), 1, maxAchievableTier);
 
         new ContainerRuleSet

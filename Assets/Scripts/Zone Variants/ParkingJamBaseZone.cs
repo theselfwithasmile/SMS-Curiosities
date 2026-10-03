@@ -40,10 +40,8 @@ public class ParkingJamBaseZone : BaseZone
     }
 
     protected override bool IsSolvable() => IsSolvable(pendingLayout);
-
-    // Board-cleared (BaseZone's default) always reads false here since Parking Jam never uses
-    // Container at all (see the class comment above) - win is "every car has escaped" instead,
-    // tracked via the count set in CommitLayout and decremented by each token's OnEscaped.
+    
+    //empty token win condition since parking jam doesn't adopt containers at all
     protected override bool CheckWinCondition() => remainingCars <= 0;
 
     protected override void CommitLayout()
@@ -89,9 +87,8 @@ public class ParkingJamBaseZone : BaseZone
         }
         ContainerManager.Shuffle(freeCells);
 
-        //fills grid until targetFilled is reached
-        //walking actual remaining free cells rather than blind-guessing coordinates, so
-        //density scales reliably instead of degrading as the board fills up
+        //fills grid until targetFilled is reached walking actual remaining free cells rather than blind-guessing coordinates
+        //so density scales reliably instead of degrading as the board fills up
         int targetFilled = Mathf.RoundToInt(EffectiveFillRatio * bounds.width * bounds.height); //percentage of grid to be filled
         foreach (Vector2Int cell in freeCells)
         {
@@ -104,10 +101,7 @@ public class ParkingJamBaseZone : BaseZone
         return cars.Count > 0 ? cars : null;
     }
 
-    //grows a bent, self-avoiding body from `start` - longer target lengths bend more often, so
-    // short pieces read as plain straight/L blockers while long ones wind like a real maze
-    // corridor.  (a shorter piece,
-    // rather than failing the whole cell).
+    //grows a bent, self-avoiding body from start
     CarSpec BuildCarAt(Vector2Int start, RectInt bounds, HashSet<Vector2Int> occupied)
     {
         int targetLength = Random.Range(minLength, maxLength + 1);
@@ -202,13 +196,16 @@ public class ParkingJamBaseZone : BaseZone
 
         bool progress = true;
 
-        //keeps iterating over the list of remaining cars until there is none left
+        //keeps iterating over the list of remaining cars until there is none left (no progress made across the iteration)
         while (progress && remaining.Count > 0)
         {
             progress = false;
+            
             for (int i = remaining.Count - 1; i >= 0; i--)
             {
                 CarSpec car = remaining[i];
+                
+                //removes any car whose escape lane is free of every other car's body
                 if (ReachesEdge(car, occupied))
                 {
                     foreach (Vector2Int cell in car.body) occupied.Remove(cell);

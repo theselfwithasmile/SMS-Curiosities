@@ -17,8 +17,7 @@ public class TileConnectBaseZone : BaseZone
         var fieldBounds = new RectInt(margin, margin, boardSize - margin * 2, boardSize - margin * 2);
         List<Container> cells = new PerTileLayout().Build(fieldBounds, GameState.Instance.BubbleColor);
 
-        //dropping one cell up front keeps the count even and pairing achievable regardless of boardSize's
-        //parity to ensure solvability
+        //dropping one cell up front to keep the count even and pairing possible
         if (cells.Count % 2 != 0)
         {
             Container extra = cells[cells.Count - 1];

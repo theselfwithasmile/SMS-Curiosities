@@ -179,6 +179,8 @@ public class ContainerManager : MonoBehaviour
     SpriteRenderer CreateVisual(Container container)
     {
         SpriteRenderer visual = Instantiate(containerPrefab, transform);
+        visual.transform.localScale = Vector3.zero;
+        TweenRunner.Instance.ChatPopIn(visual.transform, transform);
         visual.color = container.Color;
         visual.drawMode = SpriteDrawMode.Sliced;
         visual.sortingOrder = -1;
