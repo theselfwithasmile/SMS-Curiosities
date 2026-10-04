@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.EventSystems;
 using UnityEngine.Playables;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Collider2D))]
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
@@ -42,7 +43,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
 
     void Awake()
     {
-        GetComponent<SpriteRenderer>().color = GameState.Instance.SecondaryGroupColor(Group);
+        GetComponent<Image>().color = GameState.Instance.SecondaryGroupColor(Group);
     }
     
     void Update()
@@ -77,7 +78,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         clipPlayable = AnimationClipPlayable.Create(playableGraph, clip);
         output.SetSourcePlayable(clipPlayable);
         
-        GetComponent<SpriteRenderer>().color = Color.white;
+        GetComponent<Image>().color = Color.white;
 
         StopAnimationAndReset();
     }
@@ -116,34 +117,33 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     static readonly Vector2 BuriedPeekDirection = new Vector2(1f, -1f).normalized;
 
     Color revealedColor;
-    int revealedSortingOrder;
     bool isBuried;
-    
+
     public void SetRevealed(bool revealed)
     {
         if (revealed != isBuried) return;
 
-        SpriteRenderer renderer = GetComponent<SpriteRenderer>();
+        Image image = GetComponent<Image>();
         if (revealed)
         {
-            renderer.color = revealedColor;
-            renderer.sortingOrder = revealedSortingOrder;
+            image.color = revealedColor;
+            transform.SetAsLastSibling();
             transform.position -= (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
             isBuried = false;
         }
         else
         {
-            revealedColor = renderer.color;
-            revealedSortingOrder = renderer.sortingOrder;
-            renderer.color = new Color(
+            revealedColor = image.color;
+            image.color = new Color(
                 revealedColor.r * BuriedColorFactor,
                 revealedColor.g * BuriedColorFactor,
                 revealedColor.b * BuriedColorFactor,
                 revealedColor.a);
-            renderer.sortingOrder = revealedSortingOrder - 1; // always draws behind its occupant
+            transform.SetAsFirstSibling(); // UI draws in sibling order, so first = always behind its occupant
             transform.position += (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
             isBuried = true;
         }
+        image.raycastTarget = revealed; //UI pointer events come from the GraphicRaycaster, not the collider
         GetComponent<Collider2D>().enabled = revealed;
     }
 

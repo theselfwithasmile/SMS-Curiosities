@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 [System.Serializable]
 public class AnimationGroup
@@ -13,6 +14,7 @@ public class TokenSpawner : MonoBehaviour
 {
     public static TokenSpawner Instance;
     [SerializeField] private Token tokenPrefab;
+    [SerializeField] private Transform chatbot;
     [SerializeField] private List<AnimationGroup> animations;
     [SerializeField] private AnimationGroup directionAnimations;
 
@@ -23,7 +25,7 @@ public class TokenSpawner : MonoBehaviour
     
     public Token SpawnToken(int group, Vector3 worldPosition, bool byTier = false)
     {
-        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, transform);
+        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, chatbot);
         token.Group = group;
         ScaleToCell(token.transform);
         ApplyAnimation(token, byTier);
@@ -38,7 +40,7 @@ public class TokenSpawner : MonoBehaviour
     public Token SpawnColoredToken(int group, Vector3 worldPosition, bool byTier = false)
     {
         Token token = SpawnToken(group, worldPosition, byTier);
-        if (!token.HasAnimation) token.GetComponent<SpriteRenderer>().color = GameState.Instance.GroupColor(group);
+        if (!token.HasAnimation) token.GetComponent<Image>().color = GameState.Instance.GroupColor(group);
         return token;
     }
     
@@ -80,7 +82,7 @@ public class TokenSpawner : MonoBehaviour
         Token token = SpawnColoredToken(group, anchorWorldPosition);
         token.CellOffsets = new List<Vector2Int>(offsets);
 
-        SpriteRenderer baseRenderer = token.GetComponent<SpriteRenderer>();
+        Image baseRenderer = token.GetComponent<Image>();
         for (int i = 1; i < offsets.Count; i++)
         {
             var child = new GameObject($"Cell{i}");
@@ -90,10 +92,10 @@ public class TokenSpawner : MonoBehaviour
             //resetting to 1,1,1 here means "match the root", not "keep this object's old world scale"
             child.transform.localScale = Vector3.one;
 
-            var renderer = child.AddComponent<SpriteRenderer>();
+            var renderer = child.AddComponent<Image>();
             renderer.sprite = baseRenderer.sprite;
             renderer.color = baseRenderer.color;
-            renderer.sortingOrder = baseRenderer.sortingOrder;
+            //renderer.sortingOrder = baseRenderer.sortingOrder;
 
             token.CellParts.Add(child.transform);
         }

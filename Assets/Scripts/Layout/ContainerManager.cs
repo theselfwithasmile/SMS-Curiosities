@@ -1,17 +1,19 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class ContainerManager : MonoBehaviour
 {
     public static ContainerManager Instance;
 
-    [SerializeField] Token tokenPrefab;
-    [SerializeField] SpriteRenderer containerPrefab;
-
+    [SerializeField] private Token tokenPrefab;
+    [SerializeField] private Image containerPrefab;
+    [SerializeField] private Transform chatbox;
+    
     public readonly List<Container> Containers = new List<Container>();
     readonly Dictionary<Vector2Int, List<Container>> cellMemberships = new Dictionary<Vector2Int, List<Container>>();
     static readonly List<Container> NoContainers = new List<Container>();
-    readonly Dictionary<Container, SpriteRenderer> containerVisuals = new Dictionary<Container, SpriteRenderer>();
+    readonly Dictionary<Container, Image> containerVisuals = new Dictionary<Container, Image>();
 
     void Awake()
     {
@@ -78,7 +80,7 @@ public class ContainerManager : MonoBehaviour
     public void RemoveContainer(Container container)
     {
         Containers.Remove(container);
-        if (containerVisuals.TryGetValue(container, out SpriteRenderer visual))
+        if (containerVisuals.TryGetValue(container, out Image visual))
         {
             Destroy(visual.gameObject);
             containerVisuals.Remove(container);
@@ -176,19 +178,20 @@ public class ContainerManager : MonoBehaviour
     }
 
     //sizes/positions the prefab's 9-sliced sprite to exactly cover the container's rect
-    SpriteRenderer CreateVisual(Container container)
+    Image CreateVisual(Container container)
     {
-        SpriteRenderer visual = Instantiate(containerPrefab, transform);
+        Image visual = Instantiate(containerPrefab, chatbox);
         visual.transform.localScale = Vector3.zero;
-        TweenRunner.Instance.ChatPopIn(visual.transform, transform);
+        TweenRunner.Instance.ChatPopIn(visual.transform, chatbox);
         visual.color = container.Color;
-        visual.drawMode = SpriteDrawMode.Sliced;
-        visual.sortingOrder = -1;
+        //visual.drawMode = SpriteDrawMode.Sliced;
+        //visual.sortingOrder = -1;
         visual.transform.localScale = Vector3.one;  //independent of localSpace
         Vector3 min = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMin, container.Bounds.yMin));
         Vector3 max = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMax - 1, container.Bounds.yMax - 1));
         visual.transform.position = (min + max) * 0.5f;
-        visual.size = new Vector2(container.Bounds.width, container.Bounds.height) * Grid.Instance.CellSize;
+        RectTransform rect = visual.rectTransform;
+        rect.sizeDelta = new Vector2(container.Bounds.width, container.Bounds.height) * Grid.Instance.CellSize;
 
         return visual;
     }
