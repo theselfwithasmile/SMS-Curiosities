@@ -8,8 +8,7 @@ public class ContainerManager : MonoBehaviour
 
     [SerializeField] private Token tokenPrefab;
     [SerializeField] private Image containerPrefab;
-    [SerializeField] private Transform chatbox;
-    
+
     public readonly List<Container> Containers = new List<Container>();
     readonly Dictionary<Vector2Int, List<Container>> cellMemberships = new Dictionary<Vector2Int, List<Container>>();
     static readonly List<Container> NoContainers = new List<Container>();
@@ -180,19 +179,20 @@ public class ContainerManager : MonoBehaviour
     //sizes/positions the prefab's 9-sliced sprite to exactly cover the container's rect
     Image CreateVisual(Container container)
     {
-        Image visual = Instantiate(containerPrefab, chatbox);
-        visual.transform.localScale = Vector3.zero;
-        TweenRunner.Instance.ChatPopIn(visual.transform, chatbox);
+        Image visual = Instantiate(containerPrefab, Grid.Instance.ContainerLayer);
         visual.color = container.Color;
-        //visual.drawMode = SpriteDrawMode.Sliced;
-        //visual.sortingOrder = -1;
-        visual.transform.localScale = Vector3.one;  //independent of localSpace
-        Vector3 min = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMin, container.Bounds.yMin));
-        Vector3 max = Grid.Instance.CellToWorld(new Vector2Int(container.Bounds.xMax - 1, container.Bounds.yMax - 1));
-        visual.transform.position = (min + max) * 0.5f;
+        visual.type = Image.Type.Sliced;
+        visual.raycastTarget = false; //tokens drop by grid math; the backdrop must never eat a token's pointer events
+
         RectTransform rect = visual.rectTransform;
+        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f); //sizeDelta == size only with collapsed anchors
+        rect.localScale = Vector3.one;
+        Vector2 min = Grid.Instance.CellToLocal(new Vector2Int(container.Bounds.xMin, container.Bounds.yMin));
+        Vector2 max = Grid.Instance.CellToLocal(new Vector2Int(container.Bounds.xMax - 1, container.Bounds.yMax - 1));
+        rect.localPosition = (min + max) * 0.5f;
         rect.sizeDelta = new Vector2(container.Bounds.width, container.Bounds.height) * Grid.Instance.CellSize;
 
+        TweenRunner.Instance.GrowIn(rect);
         return visual;
     }
 

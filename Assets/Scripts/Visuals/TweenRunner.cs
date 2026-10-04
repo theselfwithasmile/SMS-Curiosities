@@ -36,11 +36,6 @@ public class TweenRunner : MonoBehaviour
     {
         StartCoroutine(ScaleRoutine(target, Vector3.zero, target.localScale, duration, EaseOutCubic));
     }
-    
-    public void ChatPopIn(Transform target, Transform scaleTarget, float duration = 0.15f)
-    {
-        StartCoroutine(ScaleRoutine(target, Vector3.zero, scaleTarget.localScale, duration, EaseOutCubic));
-    }
 
     public void ShrinkAndDestroy(Token token, float duration = 0.15f)
     {
@@ -51,7 +46,7 @@ public class TweenRunner : MonoBehaviour
     public void ShrinkAndDestroySequential(IEnumerable<Token> tokens, float stagger = 0.05f, float duration = 0.15f)
     {
         var list = new List<Token>(tokens);
-        foreach (Token token in list) DisableCollider(token);
+        foreach (Token token in list) DisableInteraction(token);
         StartCoroutine(ShrinkAndDestroySequentialRoutine(list, stagger, duration));
     }
 
@@ -72,8 +67,8 @@ public class TweenRunner : MonoBehaviour
     // return` it directly and pick up right after both tokens are gone.
     public IEnumerator ConvergeAndShrink(Token a, Token b, Vector3 target, float duration = 0.15f)
     {
-        DisableCollider(a);
-        DisableCollider(b);
+        DisableInteraction(a);
+        DisableInteraction(b);
 
         Vector3 startA = a != null ? a.transform.position : target;
         Vector3 startB = b != null ? b.transform.position : target;
@@ -143,7 +138,7 @@ public class TweenRunner : MonoBehaviour
         if (token == null) yield break;
 
         //destroy is deferred until the shrink finishes so disable to prevent fast re-grab
-        DisableCollider(token);
+        DisableInteraction(token);
 
         yield return ScaleRoutine(token.transform, token.transform.localScale, Vector3.zero, duration, EaseInCubic);
         if (token != null) Destroy(token.gameObject);
@@ -161,7 +156,7 @@ public class TweenRunner : MonoBehaviour
     IEnumerator CascadeShrinkAndDestroyRoutine(Token token, float stagger, float duration)
     {
         if (token == null) yield break;
-        DisableCollider(token);
+        DisableInteraction(token);
 
         for (int i = token.CellParts.Count - 1; i >= 0; i--)
         {
@@ -185,11 +180,9 @@ public class TweenRunner : MonoBehaviour
         if (target != null) yield return ScaleRoutine(target, target.localScale, baseScale, settleDuration, EaseInCubic);
     }
 
-    static void DisableCollider(Token token)
+    static void DisableInteraction(Token token)
     {
-        if (token == null) return;
-        Collider2D collider = token.GetComponent<Collider2D>();
-        if (collider != null) collider.enabled = false;
+        if (token != null) token.SetInteractable(false);
     }
 
     static float EaseOutCubic(float t) => 1f - Mathf.Pow(1f - t, 3f);

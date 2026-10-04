@@ -1,12 +1,15 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 //briefly draws a line along the route
 //PathConnectInteraction already verified, so a match reads as "connected, then cleared"
 //instead of "two tiles vanished for reasons only the rules know."
 public static class ConnectPathEffect
 {
+    const float WidthFraction = 0.15f; //line thickness as a fraction of a cell
+
     public static void ShowThenDestroy(List<Vector2Int> pathCells, Color color, Token a, Token b, float holdDuration = 0.18f)
     {
         TweenRunner.Instance.StartCoroutine(Routine(pathCells, color, a, b, holdDuration));
@@ -22,38 +25,38 @@ public static class ConnectPathEffect
         TweenRunner.Instance.ShrinkAndDestroy(b);
     }
 
+    //a UI line is one stretched Image per segment, plus a square joint at each cell so corners don't notch
     static GameObject BuildLine(List<Vector2Int> pathCells, Color color)
     {
-        var line = new GameObject("ConnectPath");
-        var renderer = line.AddComponent<LineRenderer>();
-        renderer.useWorldSpace = true;
-        renderer.positionCount = pathCells.Count;
+        var line = new GameObject("ConnectPath", typeof(RectTransform)).GetComponent<RectTransform>();
+        line.SetParent(Grid.Instance.EffectLayer, false);
+
+        float width = Grid.Instance.CellSize * WidthFraction;
         for (int i = 0; i < pathCells.Count; i++)
         {
-            renderer.SetPosition(i, Grid.Instance.CellToWorld(pathCells[i]));
+            Vector2 point = Grid.Instance.CellToLocal(pathCells[i]);
+            AddPiece(line, point, new Vector2(width, width), 0f, color);
+            if (i == 0) continue;
+
+            Vector2 previous = Grid.Instance.CellToLocal(pathCells[i - 1]);
+            Vector2 delta = point - previous;
+            float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+            AddPiece(line, (point + previous) * 0.5f, new Vector2(delta.magnitude, width), angle, color);
         }
 
-        float width = Grid.Instance.CellSize * 0.15f;
-        renderer.startWidth = width;
-        renderer.endWidth = width;
-        renderer.numCapVertices = 4;
-        renderer.material = BuildMaterial(color);
-        renderer.sortingOrder = 100;
-
-        return line;
+        return line.gameObject;
     }
-    
-    public static Material BuildMaterial(Color color)
+
+    static void AddPiece(RectTransform parent, Vector2 localPosition, Vector2 size, float angle, Color color)
     {
-        var shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null)
-        {
-            Debug.LogError("Grid: could not find shader 'Universal Render Pipeline/Unlit'.");
-        }
-        var material = new Material(shader);
-        material.color = color;
-        material.enableInstancing = true;
-        material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-        return material;
+        var piece = new GameObject("Segment", typeof(RectTransform)).GetComponent<RectTransform>();
+        piece.SetParent(parent, false);
+        piece.localPosition = localPosition;
+        piece.localRotation = Quaternion.Euler(0f, 0f, angle);
+        piece.sizeDelta = size;
+
+        var image = piece.gameObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
     }
 }

@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Playables;
 using UnityEngine.UI;
 
-[RequireComponent(typeof(Collider2D))]
+[RequireComponent(typeof(Image))]
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
     public Container CurrentContainer;
@@ -28,7 +28,6 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     Vector3 pointerOffset;
     Vector3 originalPosition;
     Container originalContainer;
-    float zDistance;
     bool dragAllowed;
     Coroutine activeMoveTween;
     
@@ -128,7 +127,7 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         {
             image.color = revealedColor;
             transform.SetAsLastSibling();
-            transform.position -= (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+            transform.position -= BuriedPeekOffset();
             isBuried = false;
         }
         else
@@ -140,11 +139,24 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
                 revealedColor.b * BuriedColorFactor,
                 revealedColor.a);
             transform.SetAsFirstSibling(); // UI draws in sibling order, so first = always behind its occupant
-            transform.position += (Vector3)(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+            transform.position += BuriedPeekOffset();
             isBuried = true;
         }
-        image.raycastTarget = revealed; //UI pointer events come from the GraphicRaycaster, not the collider
-        GetComponent<Collider2D>().enabled = revealed;
+        SetInteractable(revealed);
+    }
+
+    static Vector3 BuriedPeekOffset()
+    {
+        return Grid.Instance.BoardVectorToWorld(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+    }
+
+    //pointer events come from the canvas GraphicRaycaster, so "can be grabbed" == "some image of mine is a raycast target"
+    public void SetInteractable(bool interactable)
+    {
+        foreach (Graphic graphic in GetComponentsInChildren<Graphic>())
+        {
+            graphic.raycastTarget = interactable;
+        }
     }
 
     //cancels any in-flight drop/revert tween before repositioning 
@@ -176,18 +188,17 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
         if (!dragAllowed) return;
 
         TweenRunner.Instance.PickupPop(transform);
+        transform.SetAsLastSibling(); //carried token draws over everything on its layer
         isDragging = true;
         PlayAnimation();
 
-        Camera camera = EventCamera(eventData);
-        zDistance = camera.WorldToScreenPoint(transform.position).z;
-        pointerOffset = transform.position - PointerToWorld(eventData, camera);
+        pointerOffset = transform.position - Grid.Instance.ScreenToWorld(eventData.position);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
         if (!dragAllowed) return;
-        transform.position = PointerToWorld(eventData, EventCamera(eventData)) + pointerOffset;
+        transform.position = Grid.Instance.ScreenToWorld(eventData.position) + pointerOffset;
     }
 
     public void OnEndDrag(PointerEventData eventData)
@@ -307,16 +318,5 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
             MoveToSlot(originalPosition);
             originalContainer?.ForceAccept(this);
         }
-    }
-
-    Vector3 PointerToWorld(PointerEventData eventData, Camera camera)
-    {
-        Vector3 screenPoint = new Vector3(eventData.position.x, eventData.position.y, zDistance);
-        return camera.ScreenToWorldPoint(screenPoint);
-    }
-
-    Camera EventCamera(PointerEventData eventData)
-    {
-        return eventData.pressEventCamera != null ? eventData.pressEventCamera : Camera.main;
     }
 }

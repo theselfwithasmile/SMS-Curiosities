@@ -14,7 +14,7 @@ public class TokenSpawner : MonoBehaviour
 {
     public static TokenSpawner Instance;
     [SerializeField] private Token tokenPrefab;
-    [SerializeField] private Transform chatbot;
+    [SerializeField, Range(0.1f, 1f)] private float cellFill = 0.8f; //token edge length as a fraction of a cell
     [SerializeField] private List<AnimationGroup> animations;
     [SerializeField] private AnimationGroup directionAnimations;
 
@@ -25,16 +25,19 @@ public class TokenSpawner : MonoBehaviour
     
     public Token SpawnToken(int group, Vector3 worldPosition, bool byTier = false)
     {
-        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, chatbot);
+        Token token = Instantiate(tokenPrefab, worldPosition, Quaternion.identity, Grid.Instance.TokenLayer);
         token.Group = group;
-        ScaleToCell(token.transform);
+        SizeToCell((RectTransform)token.transform);
         ApplyAnimation(token, byTier);
         return token;
     }
-    
-    static void ScaleToCell(Transform tokenTransform)
+
+    //size lives in sizeDelta so localScale stays free (1) for the scale tweens to animate
+    void SizeToCell(RectTransform rect)
     {
-        tokenTransform.localScale *= Grid.Instance.CellSize / Grid.Instance.ReferenceCellSize;
+        rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.localScale = Vector3.one;
+        rect.sizeDelta = Vector2.one * Grid.Instance.CellSize * cellFill;
     }
     
     public Token SpawnColoredToken(int group, Vector3 worldPosition, bool byTier = false)
@@ -82,22 +85,21 @@ public class TokenSpawner : MonoBehaviour
         Token token = SpawnColoredToken(group, anchorWorldPosition);
         token.CellOffsets = new List<Vector2Int>(offsets);
 
-        Image baseRenderer = token.GetComponent<Image>();
+        Image baseImage = token.GetComponent<Image>();
+        RectTransform baseRect = baseImage.rectTransform;
         for (int i = 1; i < offsets.Count; i++)
         {
-            var child = new GameObject($"Cell{i}");
-            child.transform.position = anchorWorldPosition + (Vector3)((Vector2)offsets[i] * Grid.Instance.CellSize);
-            child.transform.SetParent(token.transform, true);
+            var child = new GameObject($"Cell{i}", typeof(RectTransform)).GetComponent<RectTransform>();
+            child.SetParent(baseRect, false);
+            child.sizeDelta = baseRect.sizeDelta;
+            child.localPosition = (Vector2)offsets[i] * Grid.Instance.CellSize; //root is unscaled, so its local units are board units
 
-            //resetting to 1,1,1 here means "match the root", not "keep this object's old world scale"
-            child.transform.localScale = Vector3.one;
+            //a raycastable child image routes drag/hover up to the Token on the root
+            var image = child.gameObject.AddComponent<Image>();
+            image.sprite = baseImage.sprite;
+            image.color = baseImage.color;
 
-            var renderer = child.AddComponent<Image>();
-            renderer.sprite = baseRenderer.sprite;
-            renderer.color = baseRenderer.color;
-            //renderer.sortingOrder = baseRenderer.sortingOrder;
-
-            token.CellParts.Add(child.transform);
+            token.CellParts.Add(child);
         }
         return token;
     }
