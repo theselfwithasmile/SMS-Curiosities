@@ -11,7 +11,8 @@ public class Spawner : MonoBehaviour
     
     void Start()
     {
-        GameFlowManager.Instance?.RegisterZoneCount(zones.Count);
+        //"WaterSortBaseZone" -> "WaterSort", used as the genre label in analytics
+        GameFlowManager.Instance?.RegisterZones(zones.ConvertAll(z => z.GetType().Name.Replace("BaseZone", "")));
 
         //gated on GameFlowManager so a fresh load lands on the menu
         if (GameFlowManager.Instance == null || GameFlowManager.Instance.State == FlowState.Playing)
