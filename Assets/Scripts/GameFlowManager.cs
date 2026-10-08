@@ -7,6 +7,8 @@ public enum FlowState { Menu, Playing, Paused, Won, Lost }
 
 public class GameFlowManager : MonoBehaviour
 {
+    [SerializeField] private Transform chatboxPrefab;
+    
     public static GameFlowManager Instance;
 
     public FlowState State { get; private set; } = FlowState.Menu;
@@ -30,7 +32,20 @@ public class GameFlowManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         
         //broadcasting only once the new scene has fully finished loading
-        SceneManager.sceneLoaded += (_, _) => OnStateChanged?.Invoke(State);
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    //sceneLoaded is static, so with domain reload disabled a handler from a previous play session would
+    //otherwise stay subscribed and fire again on every load
+    void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
+    void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        OnStateChanged?.Invoke(State);
+        if (State == FlowState.Playing) SpawnChatbox();
     }
     
     void Update()
@@ -114,6 +129,15 @@ public class GameFlowManager : MonoBehaviour
     {
         if (State != FlowState.Playing) return;
         SetState(FlowState.Lost);
+    }
+
+    void SpawnChatbox()
+    {
+        Transform chatbox = Instantiate(chatboxPrefab, Grid.Instance.Board);
+        //Message (the zone's visualParent) is authored in the scene under Board, so it already exists here;
+        //first sibling keeps the chatbox ahead of it in the vertical layout order
+        chatbox.SetAsFirstSibling();
+        TweenRunner.Instance.GrowIn(chatbox);
     }
 
     void Reload(FlowState nextState)

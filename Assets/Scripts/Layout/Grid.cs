@@ -80,6 +80,7 @@ public class Grid : MonoBehaviour
         layer.SetParent(board, false);
         layer.anchorMin = Vector2.zero;
         layer.anchorMax = Vector2.one;
+        layer.pivot = board.pivot; //shared pivot => layer-local == board-local, so CellToLocal is valid on every layer
         layer.offsetMin = Vector2.zero;
         layer.offsetMax = Vector2.zero;
         //if the board sits under/with a layout group, keep it from re-anchoring and stacking the layers

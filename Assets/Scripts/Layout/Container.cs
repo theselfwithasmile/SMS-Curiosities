@@ -229,6 +229,9 @@ public class Container
             buriedByCell[cell] = queue;
         }
         queue.Enqueue(token);
+
+        token.AttachTo(this);
+        token.transform.SetAsFirstSibling(); //draws behind the cell's occupant
     }
 
     //promotes the next token buried under this specific cell

@@ -8,8 +8,18 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Image))]
 public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
 {
-    public Container CurrentContainer;
-    
+    Container currentContainer;
+    //a token lives under its container's visual so it scrolls, scales and draws with it
+    public Container CurrentContainer
+    {
+        get => currentContainer;
+        set
+        {
+            currentContainer = value;
+            AttachTo(value);
+        }
+    }
+
     public int Group;
     public int Tier;
     public List<Vector2Int> CellOffsets = new List<Vector2Int> { Vector2Int.zero };
@@ -148,6 +158,21 @@ public class Token : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHan
     static Vector3 BuriedPeekOffset()
     {
         return Grid.Instance.BoardVectorToWorld(BuriedPeekDirection * Grid.Instance.CellSize * BuriedPeekFraction);
+    }
+
+    //container-less tokens (being dragged, orphaned) go on the token layer, above every container
+    public void AttachTo(Container container)
+    {
+        Transform visual = container != null ? ContainerManager.Instance.GetContainerObject(container) : null;
+        Transform parent = visual != null ? visual : Grid.Instance.TokenLayer;
+        if (transform.parent == parent) return;
+
+        //carried in board units instead of world space: a container still growing in has a near-zero scale,
+        //and preserving world position/scale under it would blow the token's own scale up
+        Vector3 boardPosition = Grid.Instance.Board.InverseTransformPoint(transform.position);
+        Vector3 parentOrigin = parent == Grid.Instance.TokenLayer ? Vector3.zero : parent.localPosition;
+        transform.SetParent(parent, false);
+        transform.localPosition = boardPosition - parentOrigin;
     }
 
     //pointer events come from the canvas GraphicRaycaster, so "can be grabbed" == "some image of mine is a raycast target"

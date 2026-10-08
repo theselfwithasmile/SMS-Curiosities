@@ -35,6 +35,12 @@ namespace Variants
         //true while there's no GameFlowManager to say otherwise or it explicitly says Playing
         protected bool IsPlaying => GameFlowManager.Instance == null || GameFlowManager.Instance.State == FlowState.Playing;
         
+        [SerializeField] Transform visualParent;
+
+        void Awake()
+        {
+            ContainerManager.Instance.Initialize(visualParent);
+        }
 
         void Start()
         {
@@ -76,6 +82,10 @@ namespace Variants
 
             if (CheckWinCondition())
             {
+                Transform t = new GameObject("Message",typeof(RectTransform)).transform;
+                t.transform.parent = grid.Board;
+                visualParent = t;
+                
                 zoneEnded = true;
                 GameFlowManager.Instance?.ReportWin();
             }

@@ -13,6 +13,9 @@ public class ContainerManager : MonoBehaviour
     readonly Dictionary<Vector2Int, List<Container>> cellMemberships = new Dictionary<Vector2Int, List<Container>>();
     static readonly List<Container> NoContainers = new List<Container>();
     readonly Dictionary<Container, Image> containerVisuals = new Dictionary<Container, Image>();
+    
+    Transform visualParent;
+    public void Initialize(Transform visualParent) => this.visualParent = visualParent;
 
     void Awake()
     {
@@ -22,6 +25,11 @@ public class ContainerManager : MonoBehaviour
     public IReadOnlyList<Container> GetContainersAt(Vector2Int cell)
     {
         return cellMemberships.TryGetValue(cell, out List<Container> list) ? list : NoContainers;
+    }
+
+    public Transform GetContainerObject(Container c)
+    {
+        return containerVisuals.TryGetValue(c, out Image image) ? image.transform : null;
     }
 
     //partitions totalCount into groupCount buckets, each a multiple of chunkSize
@@ -81,6 +89,11 @@ public class ContainerManager : MonoBehaviour
         Containers.Remove(container);
         if (containerVisuals.TryGetValue(container, out Image visual))
         {
+            //tokens still parented here may be mid shrink-and-destroy; let them finish instead of dying with the visual
+            foreach (Token token in visual.GetComponentsInChildren<Token>())
+            {
+                token.AttachTo(null);
+            }
             Destroy(visual.gameObject);
             containerVisuals.Remove(container);
         }
@@ -179,7 +192,7 @@ public class ContainerManager : MonoBehaviour
     //sizes/positions the prefab's 9-sliced sprite to exactly cover the container's rect
     Image CreateVisual(Container container)
     {
-        Image visual = Instantiate(containerPrefab, Grid.Instance.ContainerLayer);
+        Image visual = Instantiate(containerPrefab, visualParent);
         visual.color = container.Color;
         visual.type = Image.Type.Sliced;
         visual.raycastTarget = false; //tokens drop by grid math; the backdrop must never eat a token's pointer events
